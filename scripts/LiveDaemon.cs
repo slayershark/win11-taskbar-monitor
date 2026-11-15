@@ -351,7 +351,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                                 pct = 0.0;
                             }
                         }
-                        txtCpu.Text = Math.Round(pct) + "%";
+                        txtCpu.Text = ((int)Math.Round(pct, MidpointRounding.AwayFromZero)) + "%";
                         txtCpu.Foreground = pct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : pct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
 
                         // 2. RAM Utilization
@@ -361,7 +361,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                             totGb = mem.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
                             usedGb = (mem.ullTotalPhys - mem.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
                             rPct = totGb > 0 ? (usedGb / totGb) * 100.0 : 0;
-                            txtRam.Text = Math.Round(rPct) + "%";
+                            txtRam.Text = ((int)Math.Round(rPct, MidpointRounding.AwayFromZero)) + "%";
                             txtRam.Foreground = rPct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : rPct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
                         }
 
@@ -426,7 +426,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                         }
 
                         gpuPct = Math.Max(0.0, Math.Min(100.0, gpuPct));
-                        txtGpu.Text = Math.Round(gpuPct) + "%";
+                        txtGpu.Text = ((int)Math.Round(gpuPct, MidpointRounding.AwayFromZero)) + "%";
                         txtGpu.Foreground = gpuPct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : gpuPct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
 
 
