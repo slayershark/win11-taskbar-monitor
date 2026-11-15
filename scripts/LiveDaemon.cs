@@ -51,6 +51,12 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetShellWindow();
+
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool GetSystemTimes(out long lpIdle, out long lpKernel, out long lpUser);
 
@@ -152,6 +158,24 @@ namespace Win11TaskbarMonitor.LiveDaemon {
             return null;
         }
 
+        private static bool IsFullscreenApp(IntPtr taskbarHwnd) {
+            try {
+                IntPtr fg = GetForegroundWindow();
+                if (fg == IntPtr.Zero || fg == taskbarHwnd || fg == GetShellWindow()) return false;
+                IntPtr progman = FindWindow("Progman", null);
+                if (fg == progman) return false;
+                RECT r;
+                if (GetWindowRect(fg, out r)) {
+                    int w = (int)SystemParameters.PrimaryScreenWidth;
+                    int h = (int)SystemParameters.PrimaryScreenHeight;
+                    if (r.Left <= 0 && r.Top <= 0 && r.Right >= w && r.Bottom >= h) {
+                        return true;
+                    }
+                }
+            } catch {}
+            return false;
+        }
+
         public static void Launch(int posX, string capPath) {
             IntPtr hDesk = OpenDesktop("Default", 0, false, 0x01FF);
             GetSystemTimes(out _pIdle, out _pKernel, out _pUser);
@@ -185,7 +209,8 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 win.WindowStyle = WindowStyle.None;
                 win.AllowsTransparency = true;
                 win.Background = System.Windows.Media.Brushes.Transparent;
-                win.Topmost = false;
+                win.Topmost = true;
+                win.ShowActivated = false;
                 win.ShowInTaskbar = false;
                 win.SizeToContent = SizeToContent.WidthAndHeight;
                 win.ResizeMode = ResizeMode.NoResize;
@@ -199,7 +224,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 int widgetH = 36;
                 int initialMargin = Math.Max(2, (trayH - widgetH) / 2);
 
-                int defaultX = posX > 0 ? posX : (rTray.Left + initialMargin);
+                int defaultX = posX > 0 ? posX : (rTray.Left + 12);
                 int defaultY = rTray.Top + initialMargin;
                 win.Left = defaultX;
                 win.Top = defaultY;
@@ -232,6 +257,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                         border.CornerRadius = new CornerRadius(6);
                     }
                 };
+                applyStyle();
 
                 border.MouseEnter += (s, e) => {
                     border.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 255, 255, 255));
@@ -567,7 +593,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                         int smartMargin = Math.Max(2, (int)Math.Round((curTrayH - contentH) / 2.0));
 
                         if (isLocked) {
-                            int targetX = rCurTray.Left + smartMargin;
+                            int targetX = rCurTray.Left + 12;
                             int targetY = rCurTray.Top + smartMargin;
                             if (Math.Abs(win.Left - targetX) > 0.5 || Math.Abs(win.Top - targetY) > 0.5) {
                                 win.Left = targetX;
@@ -586,9 +612,14 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                         tt.Content = string.Format("{0}\n{1}\n{2}", cpuLine, gpuLine, ramLine);
 
-                        // Maintain Z-order anchored directly to the Taskbar surface (never hovering over fullscreen apps)
-                        if (mainHwnd != IntPtr.Zero && curTray != IntPtr.Zero) {
-                            SetWindowPos(mainHwnd, curTray, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
+                        // Maintain Z-order anchored directly to the Taskbar surface (auto-hide if fullscreen app is active)
+                        if (mainHwnd != IntPtr.Zero) {
+                            if (IsFullscreenApp(curTray)) {
+                                if (win.Visibility != Visibility.Collapsed) win.Visibility = Visibility.Collapsed;
+                            } else {
+                                if (win.Visibility != Visibility.Visible) win.Visibility = Visibility.Visible;
+                                SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
+                            }
                         }
                     } catch {}
                 };
@@ -598,19 +629,15 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                     int style = GetWindowLong(mainHwnd, -20);
                     SetWindowLong(mainHwnd, -20, style | 0x08000080);
 
-                    // Explicitly attach as an owned window of Shell_TrayWnd so it actually sits ON the taskbar
-                    IntPtr taskbarHwnd = FindWindow("Shell_TrayWnd", null);
-                    if (taskbarHwnd != IntPtr.Zero) {
-                        SetWindowLongPtr(mainHwnd, -8 /* GWL_HWNDPARENT */, taskbarHwnd);
-                        SetWindowPos(mainHwnd, taskbarHwnd, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
-                    }
+                    // Ensure window stays directly on top of the taskbar glass in the Topmost band
+                    SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
 
                     // Immediate initial layout update for smart margin
                     border.UpdateLayout();
-                    double h = border.ActualHeight > 0 ? border.ActualHeight : 36.0;
+                    double h = border.ActualHeight > 0 ? border.ActualHeight : 34.0;
                     int sm = Math.Max(2, (int)Math.Round(((rTray.Bottom - rTray.Top) - h) / 2.0));
                     if (posX <= 0) {
-                        win.Left = rTray.Left + sm;
+                        win.Left = rTray.Left + 12;
                         win.Top = rTray.Top + sm;
                     }
 

@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.1.7] - 2026-11-15
+
+### Fixed
+- **Taskbar Visibility & Windows 11 DirectComposition Layering**:
+  - **DirectComposition Occlusion Resolved**: Fixed issue where removing `Topmost` caused Windows 11's DirectComposition/XAML Islands taskbar layer (`Shell_TrayWnd`) to occlude the widget completely. Restored `win.Topmost = true` and `SetWindowPos(HWND_TOPMOST)` so metrics render clearly on the taskbar glass.
+  - **Fullscreen Media & App Auto-Hide**: Implemented `IsFullscreenApp` detection checking foreground window bounds against primary display resolution. Automatically hides the widget during fullscreen games, videos, or presentations to guarantee it never hovers over fullscreen content.
+  - **Seamless Native Taskbar Styling**: Retained flat transparent background (`Background = Transparent`) and borderless design (`BorderThickness = 0`) with subtle capsule hover highlight, sitting flush directly on the taskbar surface.
+  - **Updated Package**: Refreshed release zip at `dist/Win11TaskbarMonitor-Setup.zip` and updated active installation in `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor`.
+
+---
+
 ## [1.1.6] - 2026-11-15
 
 ### Changed

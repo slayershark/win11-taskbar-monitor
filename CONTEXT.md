@@ -27,6 +27,11 @@
 
 ## 3. Completed Features
 
+- [x] **Taskbar Visibility & DirectComposition Layering with Fullscreen Auto-Hide**:
+  - Diagnosed and resolved widget occlusion where setting `Topmost = false` caused Windows 11 `Shell_TrayWnd`'s DirectComposition/XAML Islands surfaces to draw over the widget, hiding it completely.
+  - Restored `win.Topmost = true` and `SetWindowPos(HWND_TOPMOST)` so the telemetry metrics sit clearly on top of the taskbar glass without being covered.
+  - Retained 100% transparent background (`Background = Transparent`) and zero border (`BorderThickness = 0`) so the metrics appear as native text directly on the taskbar glass without a floating card appearance.
+  - Implemented `IsFullscreenApp` detection checking foreground window coordinates against screen resolution; automatically hides the widget when a fullscreen application (games, YouTube fullscreen, media players) is active, completely eliminating any unwanted floating over fullscreen media.
 - [x] **Native Taskbar Integration & Flush Surface Docking**:
   - Bound widget directly to the Windows Taskbar as an owned window using `SetWindowLongPtr(mainHwnd, GWL_HWNDPARENT, taskbarHwnd)`, so its Z-order and visibility are tied natively to `Shell_TrayWnd` rather than floating as an independent `HWND_TOPMOST` overlay.
   - Eliminated the floating dark card background and outer borders (`BorderThickness = 0`, `Background = Transparent`), rendering telemetry text directly onto the Windows 11 acrylic/mica glass surface matching native taskbar controls.
