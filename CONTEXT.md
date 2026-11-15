@@ -21,7 +21,7 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `a939b17` (fix: resolve Unicode PDH GPU engine parsing and align real-time metrics with Task Manager)
+  - Latest Commit: `641ab50` (fix: switch CPU counter to Processor Time to match Windows 11 Task Manager exactly)
 
 ---
 
