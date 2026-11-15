@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.0.3] - 2026-11-15
+
+### Changed
+- **Removed Unavailable CPU Temperature (`CPU° N/A`)**:
+  - Eliminated the middle `CPU° N/A` column, keeping the active telemetry metrics: `CPU`, `GPU`, `GPU°`, and `RAM`.
+  - Streamlined hover tooltip to remove the `CPU Temp: N/A` line.
+- **Fixed Left-Side Taskbar Alignment with Equal Margins**:
+  - Positioned the widget fixed on the far left side of the Windows 11 taskbar.
+  - Calculated exact equal 6px margins on the top, bottom, and left (`Left = 6, Top = 1038` inside the 48px taskbar).
+  - Added "Lock Position (Fixed)" option (checked by default) to keep the widget anchored without accidental drag movement.
+  - Updated `AppSettings.cs` and `TaskbarAnchorEngine.cs` with `TaskbarAlignment.LeftEdge` support.
+  - Visual proof captured at `verified_taskbar_left_fixed.png`.
+
+---
+
 ## [1.0.2] - 2026-11-15
 
 ### Added

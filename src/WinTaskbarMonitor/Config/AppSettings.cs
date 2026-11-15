@@ -18,6 +18,7 @@ public enum AppThemeMode
 
 public enum TaskbarAlignment
 {
+    LeftEdge,
     LeftOfTray,
     RightEdge,
     Custom
@@ -29,7 +30,7 @@ public sealed class AppSettings
 
     public bool ShowCpu { get; set; } = true;
     public bool ShowGpu { get; set; } = true;
-    public bool ShowCpuTemp { get; set; } = true;
+    public bool ShowCpuTemp { get; set; } = false;
     public bool ShowGpuTemp { get; set; } = true;
     public bool ShowRam { get; set; } = true;
 
@@ -45,7 +46,7 @@ public sealed class AppSettings
     public AppThemeMode ThemeMode { get; set; } = AppThemeMode.System;
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public TaskbarAlignment Alignment { get; set; } = TaskbarAlignment.LeftOfTray;
+    public TaskbarAlignment Alignment { get; set; } = TaskbarAlignment.LeftEdge;
 
     public bool StartWithWindows { get; set; } = false;
 

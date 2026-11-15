@@ -171,8 +171,19 @@ public sealed class TaskbarAnchorEngine : IDisposable
             RECT trayRect = default;
             bool hasTrayRect = trayNotifyWnd != IntPtr.Zero && GetWindowRect(trayNotifyWnd, out trayRect);
 
+            // Calculate Y anchor (vertically centered in taskbar)
+            double taskbarHeightDpi = taskbarRect.Height / dpiY;
+            double taskbarTopDpi = taskbarRect.Top / dpiY;
+            double vMargin = Math.Max(2, (taskbarHeightDpi - windowHeight) / 2.0);
+            targetScreenY = taskbarTopDpi + vMargin;
+
             // Calculate X anchor
-            if (settings.Alignment == TaskbarAlignment.RightEdge || !hasTrayRect)
+            if (settings.Alignment == TaskbarAlignment.LeftEdge)
+            {
+                // Fixed on left side of taskbar with equal margin
+                targetScreenX = (taskbarRect.Left / dpiX) + vMargin;
+            }
+            else if (settings.Alignment == TaskbarAlignment.RightEdge || !hasTrayRect)
             {
                 // Right aligned before quick settings (reserve ~240 physical px for clock/wifi/battery)
                 int reservedTrayWidth = (int)(240 * dpiX);
@@ -184,11 +195,6 @@ public sealed class TaskbarAnchorEngine : IDisposable
                 int margin = (int)(12 * dpiX);
                 targetScreenX = (trayRect.Left - margin - (windowWidth * dpiX)) / dpiX;
             }
-
-            // Calculate Y anchor (vertically centered in taskbar)
-            double taskbarHeightDpi = taskbarRect.Height / dpiY;
-            double taskbarTopDpi = taskbarRect.Top / dpiY;
-            targetScreenY = taskbarTopDpi + Math.Max(2, (taskbarHeightDpi - windowHeight) / 2.0);
 
             // Apply manual user offset from settings
             targetScreenX += settings.OffsetX;

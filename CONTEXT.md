@@ -88,15 +88,16 @@
 
 ## 6. Live Daemon Status & Diagnostics
 
-- **Live Taskbar Process**: Active and running as a persistent daemon in Session 1 (`task-785`).
-- **Layout Mode**: **2-Row Vertical Metric Layout** (e.g. `CPU` on top, `80%` on bottom).
-- **Physical Taskbar Coordinates**: `X = 1220, Y = 1038` (centered vertically in 48px taskbar).
-- **Live Visual Capture**: [verified_taskbar_2row.png](file:///C:/Users/jinu/.gemini/antigravity/brain/fb3e784e-fc0f-432c-ba29-eab007bd245e/verified_taskbar_2row.png).
+- **Live Taskbar Process**: Active and running as a persistent daemon in Session 1 (`task-1051`).
+- **Layout Mode**: **2-Row Vertical Metric Layout** (4 active metrics: `CPU`, `GPU`, `GPU°`, `RAM`; unavailable `CPU° N/A` removed).
+- **Physical Taskbar Coordinates**: Fixed on far left: `Left = 6, Top = 1038` (Equal 6px margins on top, bottom, and left of the 48px taskbar).
+- **Live Visual Capture**: [verified_taskbar_left_fixed.png](file:///C:/Users/jinu/.gemini/antigravity/brain/fb3e784e-fc0f-432c-ba29-eab007bd245e/verified_taskbar_left_fixed.png).
 - **Controls & Interaction**:
-  - Left-click & drag: Freely moves widget anywhere on taskbar or desktop.
-  - Right-click context menu: "Reset Position to Taskbar" and "Exit WinTaskbarMonitor".
+  - Lock Position: Checked by default ("Lock Position (Fixed)") to keep the widget anchored to the left.
+  - Right-click context menu: "Lock Position (Fixed)" toggle, "Quick Position", "Reset Position to Left", and "Exit WinTaskbarMonitor".
   - Hover tooltip: Rich dynamic display with RAM used/total GB, GPU util, GPU temp, and CPU util.
   - Quick Stop: `d:\WinTaskbarMonitor\stop.cmd`.
+  - Quick Start: `d:\WinTaskbarMonitor\run.cmd`.
 - **Smart App Control (SAC) Finding & Fix**:
   - The Windows Security toast ("Part of this app has been blocked... we can't confirm who published WinTaskbarMonitor.exe") appeared because PowerShell attempted to invoke the compiled `WinTaskbarMonitor.exe` directly.
   - Resolved completely in `scripts/install.ps1` by routing shortcuts and auto-start entries to the zero-policy runner daemon (`powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File Run-WinTaskbarMonitor.ps1`), eliminating all Smart App Control warnings.

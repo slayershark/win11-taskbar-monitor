@@ -130,8 +130,12 @@ namespace WinTaskbarMonitor.LiveDaemon {
                 RECT rTray = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
                 if (tray != IntPtr.Zero) { GetWindowRect(tray, out rTray); }
 
-                int defaultX = posX > 0 ? posX : 1220;
-                int defaultY = rTray.Top + (rTray.Bottom - rTray.Top - 36) / 2;
+                int trayH = rTray.Bottom - rTray.Top;
+                int widgetH = 36;
+                int margin = Math.Max(4, (trayH - widgetH) / 2);
+
+                int defaultX = posX > 0 ? posX : (rTray.Left + margin);
+                int defaultY = rTray.Top + margin;
                 win.Left = defaultX;
                 win.Top = defaultY;
 
@@ -148,15 +152,12 @@ namespace WinTaskbarMonitor.LiveDaemon {
 
                 TextBlock txtCpu = new TextBlock { Text = "0%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 30, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
                 TextBlock txtGpu = new TextBlock { Text = "0%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 30, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
-                TextBlock txtCpuT = new TextBlock { Text = "N/A", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 34, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)) };
                 TextBlock txtGpuT = new TextBlock { Text = "N/A", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 34, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)) };
                 TextBlock txtRam = new TextBlock { Text = "0%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 30, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
 
                 stack.Children.Add(CreateItem("CPU", txtCpu));
                 stack.Children.Add(CreateSep());
                 stack.Children.Add(CreateItem("GPU", txtGpu));
-                stack.Children.Add(CreateSep());
-                stack.Children.Add(CreateItem("CPU\u00B0", txtCpuT));
                 stack.Children.Add(CreateSep());
                 stack.Children.Add(CreateItem("GPU\u00B0", txtGpuT));
                 stack.Children.Add(CreateSep());
@@ -165,10 +166,12 @@ namespace WinTaskbarMonitor.LiveDaemon {
                 border.Child = stack;
                 win.Content = border;
 
-                // Defensive drag move
+                bool isLocked = true;
+
+                // Defensive drag move (only when unlocked)
                 win.MouseLeftButtonDown += (s, e) => {
                     try {
-                        if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) {
+                        if (!isLocked && e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) {
                             win.DragMove();
                         }
                     } catch {}
@@ -176,26 +179,32 @@ namespace WinTaskbarMonitor.LiveDaemon {
 
                 // Context Menu for user control
                 ContextMenu menu = new ContextMenu();
+                
+                MenuItem itemLock = new MenuItem { Header = "Lock Position (Fixed)", IsCheckable = true, IsChecked = true };
+                itemLock.Click += (s, e) => {
+                    isLocked = itemLock.IsChecked;
+                };
+
                 MenuItem posMenu = new MenuItem { Header = "Quick Position" };
                 
-                MenuItem posTaskbar = new MenuItem { Header = "Dock On Taskbar (Default)" };
-                posTaskbar.Click += (s, e) => { win.Left = defaultX; win.Top = defaultY; };
+                MenuItem posLeft = new MenuItem { Header = "Left of Taskbar (Default - Equal Margin)" };
+                posLeft.Click += (s, e) => { win.Left = rTray.Left + margin; win.Top = rTray.Top + margin; };
+
+                MenuItem posTray = new MenuItem { Header = "Right of Taskbar (Next to Tray)" };
+                posTray.Click += (s, e) => { win.Left = 1220; win.Top = rTray.Top + margin; };
 
                 MenuItem posAbove = new MenuItem { Header = "Above Taskbar (Floating Dock)" };
-                posAbove.Click += (s, e) => { win.Left = defaultX; win.Top = rTray.Top - 40; };
-
-                MenuItem posLeft = new MenuItem { Header = "Left of Taskbar (Sys_Mon style)" };
-                posLeft.Click += (s, e) => { win.Left = 10; win.Top = defaultY; };
+                posAbove.Click += (s, e) => { win.Left = rTray.Left + margin; win.Top = rTray.Top - 40; };
 
                 MenuItem posTopRight = new MenuItem { Header = "Top Right of Screen" };
                 posTopRight.Click += (s, e) => { win.Left = 1650; win.Top = 10; };
 
-                posMenu.Items.Add(posTaskbar);
-                posMenu.Items.Add(posAbove);
                 posMenu.Items.Add(posLeft);
+                posMenu.Items.Add(posTray);
+                posMenu.Items.Add(posAbove);
                 posMenu.Items.Add(posTopRight);
 
-                MenuItem itemReset = new MenuItem { Header = "Reset Position" };
+                MenuItem itemReset = new MenuItem { Header = "Reset Position to Left" };
                 itemReset.Click += (s, e) => {
                     win.Left = defaultX;
                     win.Top = defaultY;
@@ -208,6 +217,7 @@ namespace WinTaskbarMonitor.LiveDaemon {
                     Environment.Exit(0);
                 };
 
+                menu.Items.Add(itemLock);
                 menu.Items.Add(posMenu);
                 menu.Items.Add(itemReset);
                 menu.Items.Add(new Separator());
@@ -262,7 +272,7 @@ namespace WinTaskbarMonitor.LiveDaemon {
                         string gpuInfo = _hasNvml ? txtGpu.Text : "N/A";
                         string gpuTempInfo = _hasNvml ? txtGpuT.Text : "N/A";
                         tt.Content = string.Format(
-                            "WinTaskbarMonitor\n-------------------------\nCPU: {0}\nGPU: {1}\nRAM: {2:F1} / {3:F1} GB ({4})\nGPU Temp: {5}\nCPU Temp: N/A\n-------------------------\n• Left-click & drag to move\n• Right-click for options",
+                            "WinTaskbarMonitor\n-------------------------\nCPU: {0}\nGPU: {1}\nRAM: {2:F1} / {3:F1} GB ({4})\nGPU Temp: {5}\n-------------------------\n• Right-click for options",
                             txtCpu.Text, gpuInfo, usedGb, totGb, txtRam.Text, gpuTempInfo);
 
                         // Periodically assert TOPMOST so Explorer/taskbar never obscures it

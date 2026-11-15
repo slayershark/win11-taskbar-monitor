@@ -1,6 +1,6 @@
 ﻿# WinTaskbarMonitor — Persistent Live Desktop Monitor
 param(
-    [int]$AnchorX = 1220,
+    [int]$AnchorX = 0,
     [string]$CaptureProofPath = ""
 )
 
