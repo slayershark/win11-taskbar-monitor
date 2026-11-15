@@ -21,7 +21,7 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `ff82863` (fix: enforce AwayFromZero integer rounding to match Task Manager display exactly)
+  - Latest Commit: `1875bd5` (fix: resolve taskbar occlusion and add fullscreen auto-hide)
 
 ---
 
