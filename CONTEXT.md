@@ -21,12 +21,17 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `96e58ce` (docs: update CONTEXT.md with commit e671fd0)
+  - Latest Commit: `f15e662` (feat: complete universal distribution package and zip installer for any Windows machine)
 
 ---
 
 ## 3. Completed Features
 
+- [x] **Real-Time Synchronization with Windows Task Manager**:
+  - Switched CPU calculation from legacy unscaled `GetSystemTimes` (`% Processor Time`) to Windows Performance Data Helper (`\Processor Information(_Total)\% Processor Utility`), matching Windows Task Manager's turbo/frequency-scaled CPU calculation with defensive fallback.
+  - Implemented multi-GPU aggregation via `\GPU Engine(*)\Utilization Percentage` across all graphics adapters (Intel Iris Xe / integrated, AMD Radeon, NVIDIA GeForce), eliminating the issue where desktop activity on integrated GPU showed 0% while discrete GPU was idling.
+  - Retained dedicated NVML hardware polling for discrete NVIDIA GPU temperature and heavy 3D/CUDA loads.
+  - Updated both `scripts/LiveDaemon.cs` and compiled providers `CpuMonitorProvider.cs`, `GpuMonitorProvider.cs`, and `HardwareMonitorCoordinator.cs`.
 - [x] **Universal Standalone Setup Package for Any Windows Machine**:
   - Created automated build tool `scripts/Build-ReleasePackage.ps1` producing `dist/Win11TaskbarMonitor-Setup.zip` (1.65 MB).
   - Works on any clean Windows 11 or Windows 10 PC out-of-the-box with **zero prerequisites**, no .NET SDK required, and no developer tools.

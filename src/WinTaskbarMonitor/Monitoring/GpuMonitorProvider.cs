@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using LibreHardwareMonitor.Hardware;
 
@@ -8,6 +9,28 @@ namespace WinTaskbarMonitor.Monitoring;
 
 public sealed class GpuMonitorProvider : IDisposable
 {
+    // PDH APIs for Windows Task Manager GPU engine metrics
+    [DllImport("pdh.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern int PdhOpenQuery(string? szDataSource, IntPtr dwUserData, out IntPtr phQuery);
+
+    [DllImport("pdh.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern int PdhAddEnglishCounter(IntPtr hQuery, string szFullCounterPath, IntPtr dwUserData, out IntPtr phCounter);
+
+    [DllImport("pdh.dll", SetLastError = true)]
+    private static extern int PdhCollectQueryData(IntPtr hQuery);
+
+    [DllImport("pdh.dll", SetLastError = true)]
+    private static extern int PdhGetFormattedCounterArray(IntPtr hCounter, uint dwFormat, ref uint lpdwBufferSize, ref uint lpdwItemCount, IntPtr ItemBuffer);
+
+    [DllImport("pdh.dll", SetLastError = true)]
+    private static extern int PdhCloseQuery(IntPtr hQuery);
+
+    private const uint PDH_FMT_DOUBLE = 0x00000200;
+
+    private IntPtr _hPdhQuery = IntPtr.Zero;
+    private IntPtr _hGpuCounter = IntPtr.Zero;
+    private bool _pdhGpuInitialized;
+
     private readonly List<GpuDeviceInfo> _devices = new();
     private IntPtr _nvmlDeviceHandle = IntPtr.Zero;
     private bool _nvmlInitialized;
@@ -31,7 +54,24 @@ public sealed class GpuMonitorProvider : IDisposable
 
     private void Initialize()
     {
-        // 1. Try Initialize NVML
+        // 1. Try Initialize PDH GPU Engine (matches Task Manager across all GPUs)
+        try
+        {
+            if (PdhOpenQuery(null, IntPtr.Zero, out _hPdhQuery) == 0)
+            {
+                if (PdhAddEnglishCounter(_hPdhQuery, @"\GPU Engine(*)\Utilization Percentage", IntPtr.Zero, out _hGpuCounter) == 0)
+                {
+                    PdhCollectQueryData(_hPdhQuery);
+                    _pdhGpuInitialized = true;
+                }
+            }
+        }
+        catch
+        {
+            _pdhGpuInitialized = false;
+        }
+
+        // 2. Try Initialize NVML
         if (NvmlInterop.IsNvmlAvailable())
         {
             try
@@ -69,7 +109,7 @@ public sealed class GpuMonitorProvider : IDisposable
             }
         }
 
-        // 2. Open LibreHardwareMonitor for Intel/AMD/Other GPUs
+        // 3. Open LibreHardwareMonitor for Intel/AMD/Other GPUs
         try
         {
             _computer.Open();
@@ -86,7 +126,6 @@ public sealed class GpuMonitorProvider : IDisposable
                         _ => "Unknown"
                     };
 
-                    // Don't add duplicate if NVML already detected NVIDIA GPU
                     bool alreadyAdded = _devices.Exists(d => d.Vendor == vendor && d.Name.Equals(hw.Name, StringComparison.OrdinalIgnoreCase));
                     if (!alreadyAdded)
                     {
@@ -113,7 +152,6 @@ public sealed class GpuMonitorProvider : IDisposable
     {
         _selectedGpuIndex = index;
 
-        // Auto mode (-1): Select discrete GPU if present, else first GPU
         int targetIndex = index;
         if (targetIndex < 0 || targetIndex >= _devices.Count)
         {
@@ -161,26 +199,90 @@ public sealed class GpuMonitorProvider : IDisposable
         double usage = 0.0;
         double? tempC = null;
 
-        // Try NVML first if NVIDIA
+        // 1. Query PDH for system-wide Task Manager GPU utilization
+        if (_selectedGpuIndex < 0 && _pdhGpuInitialized && _hPdhQuery != IntPtr.Zero && _hGpuCounter != IntPtr.Zero)
+        {
+            try
+            {
+                if (PdhCollectQueryData(_hPdhQuery) == 0)
+                {
+                    uint bufSize = 0, count = 0;
+                    PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, IntPtr.Zero);
+                    if (bufSize > 0)
+                    {
+                        IntPtr pBuf = Marshal.AllocHGlobal((int)bufSize);
+                        try
+                        {
+                            if (PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, pBuf) == 0)
+                            {
+                                var pidMax = new Dictionary<int, double>();
+                                for (int idx = 0; idx < count; idx++)
+                                {
+                                    IntPtr itemPtr = new IntPtr(pBuf.ToInt64() + idx * 24);
+                                    double val = Marshal.PtrToStructure<double>(new IntPtr(pBuf.ToInt64() + idx * 24 + 16));
+                                    if (val > 0.01)
+                                    {
+                                        IntPtr szName = Marshal.ReadIntPtr(itemPtr, 0);
+                                        string? name = Marshal.PtrToStringUni(szName);
+                                        int pid = 0;
+                                        if (name != null && name.StartsWith("pid_"))
+                                        {
+                                            int under = name.IndexOf('_', 4);
+                                            if (under > 4)
+                                            {
+                                                int.TryParse(name.Substring(4, under - 4), out pid);
+                                            }
+                                        }
+                                        if (pidMax.TryGetValue(pid, out var existing))
+                                        {
+                                            if (val > existing) pidMax[pid] = val;
+                                        }
+                                        else
+                                        {
+                                            pidMax[pid] = val;
+                                        }
+                                    }
+                                }
+                                double sum = 0.0;
+                                foreach (var v in pidMax.Values) { sum += v; }
+                                usage = sum;
+                            }
+                        }
+                        finally
+                        {
+                            Marshal.FreeHGlobal(pBuf);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback below
+            }
+        }
+
+        // 2. Try NVML for NVIDIA metrics (temperature and utilization if higher)
         if (_nvmlInitialized && dev.Vendor == "NVIDIA" && _nvmlDeviceHandle != IntPtr.Zero)
         {
             try
             {
                 if (NvmlInterop.nvmlDeviceGetUtilizationRates(_nvmlDeviceHandle, out var util) == NvmlInterop.NVML_SUCCESS)
                 {
-                    usage = util.gpu;
+                    usage = Math.Max(usage, (double)util.gpu);
                 }
 
                 if (NvmlInterop.nvmlDeviceGetTemperature(_nvmlDeviceHandle, NvmlInterop.NVML_TEMPERATURE_GPU, out uint t) == NvmlInterop.NVML_SUCCESS)
                 {
-                    // Filter out 0 or unreasonable temperature readings
                     if (t > 0 && t < 125)
                     {
                         tempC = t;
                     }
                 }
 
-                return (Math.Clamp(usage, 0.0, 100.0), tempC, dev.Name);
+                if (usage > 0 || tempC.HasValue)
+                {
+                    return (Math.Clamp(usage, 0.0, 100.0), tempC, dev.Name);
+                }
             }
             catch
             {
@@ -188,7 +290,7 @@ public sealed class GpuMonitorProvider : IDisposable
             }
         }
 
-        // LibreHardwareMonitor query
+        // 3. LibreHardwareMonitor query
         if (_lhmSelectedGpu != null)
         {
             try
@@ -225,6 +327,18 @@ public sealed class GpuMonitorProvider : IDisposable
 
     public void Dispose()
     {
+        if (_hPdhQuery != IntPtr.Zero)
+        {
+            try
+            {
+                PdhCloseQuery(_hPdhQuery);
+            }
+            catch { }
+            _hPdhQuery = IntPtr.Zero;
+            _hGpuCounter = IntPtr.Zero;
+            _pdhGpuInitialized = false;
+        }
+
         if (_nvmlInitialized)
         {
             try
@@ -235,7 +349,6 @@ public sealed class GpuMonitorProvider : IDisposable
             {
                 // Ignore
             }
-            _nvmlInitialized = false;
         }
 
         try

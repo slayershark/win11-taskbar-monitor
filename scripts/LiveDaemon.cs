@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Threading;
@@ -64,6 +65,32 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         [DllImport("nvml.dll", EntryPoint = "nvmlShutdown")]
         public static extern int nvmlShutdown();
 
+        [DllImport("pdh.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern int PdhOpenQuery(string szDataSource, IntPtr dwUserData, out IntPtr phQuery);
+
+        [DllImport("pdh.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern int PdhAddEnglishCounter(IntPtr hQuery, string szFullCounterPath, IntPtr dwUserData, out IntPtr phCounter);
+
+        [DllImport("pdh.dll", SetLastError = true)]
+        public static extern int PdhCollectQueryData(IntPtr hQuery);
+
+        [DllImport("pdh.dll", SetLastError = true)]
+        public static extern int PdhGetFormattedCounterArray(IntPtr hCounter, uint dwFormat, ref uint lpdwBufferSize, ref uint lpdwItemCount, IntPtr ItemBuffer);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct PDH_FMT_COUNTERVALUE {
+            public uint CStatus;
+            public double doubleValue;
+        }
+
+        [DllImport("pdh.dll", SetLastError = true)]
+        public static extern int PdhGetFormattedCounterValue(IntPtr hCounter, uint dwFormat, IntPtr lpdwType, out PDH_FMT_COUNTERVALUE pValue);
+
+        [DllImport("pdh.dll", SetLastError = true)]
+        public static extern int PdhCloseQuery(IntPtr hQuery);
+
+        public const uint PDH_FMT_DOUBLE = 0x00000200;
+
         [StructLayout(LayoutKind.Sequential)]
         public struct RECT { public int Left, Top, Right, Bottom; }
 
@@ -87,6 +114,10 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         private static long _pIdle, _pKernel, _pUser;
         private static IntPtr _nvmlDev = IntPtr.Zero;
         private static bool _hasNvml = false;
+        private static IntPtr _hPdhQuery = IntPtr.Zero;
+        private static IntPtr _hCpuCounter = IntPtr.Zero;
+        private static IntPtr _hGpuCounter = IntPtr.Zero;
+        private static bool _hasPdh = false;
 
         private static double? QueryCpuTemp() {
             try {
@@ -111,6 +142,15 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         public static void Launch(int posX, string capPath) {
             IntPtr hDesk = OpenDesktop("Default", 0, false, 0x01FF);
             GetSystemTimes(out _pIdle, out _pKernel, out _pUser);
+
+            try {
+                if (PdhOpenQuery(null, IntPtr.Zero, out _hPdhQuery) == 0) {
+                    PdhAddEnglishCounter(_hPdhQuery, @"\Processor Information(_Total)\% Processor Utility", IntPtr.Zero, out _hCpuCounter);
+                    PdhAddEnglishCounter(_hPdhQuery, @"\GPU Engine(*)\Utilization Percentage", IntPtr.Zero, out _hGpuCounter);
+                    PdhCollectQueryData(_hPdhQuery);
+                    _hasPdh = true;
+                }
+            } catch {}
 
             try {
                 if (nvmlInit_v2() == 0) {
@@ -293,17 +333,36 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 timer.Interval = TimeSpan.FromSeconds(1);
                 timer.Tick += (s, e) => {
                     try {
-                        long i, k, u;
-                        if (GetSystemTimes(out i, out k, out u)) {
-                            long tot = (k - _pKernel) + (u - _pUser);
-                            long idl = i - _pIdle;
-                            _pIdle = i; _pKernel = k; _pUser = u;
-                            double pct = tot > 0 ? (double)(tot - idl) / tot * 100.0 : 0;
-                            pct = Math.Max(0, Math.Min(100, pct));
-                            txtCpu.Text = Math.Round(pct) + "%";
-                            txtCpu.Foreground = pct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : pct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
+                        if (_hasPdh) {
+                            try { PdhCollectQueryData(_hPdhQuery); } catch {}
                         }
 
+                        // 1. CPU Utilization (matches Task Manager % Processor Utility)
+                        double pct = -1.0;
+                        if (_hasPdh && _hCpuCounter != IntPtr.Zero) {
+                            try {
+                                PDH_FMT_COUNTERVALUE cpuVal;
+                                if (PdhGetFormattedCounterValue(_hCpuCounter, PDH_FMT_DOUBLE, IntPtr.Zero, out cpuVal) == 0 && cpuVal.CStatus == 0) {
+                                    pct = Math.Max(0.0, Math.Min(100.0, cpuVal.doubleValue));
+                                }
+                            } catch {}
+                        }
+                        if (pct < 0.0) {
+                            long i, k, u;
+                            if (GetSystemTimes(out i, out k, out u)) {
+                                long tot = (k - _pKernel) + (u - _pUser);
+                                long idl = i - _pIdle;
+                                _pIdle = i; _pKernel = k; _pUser = u;
+                                pct = tot > 0 ? (double)(tot - idl) / tot * 100.0 : 0.0;
+                                pct = Math.Max(0.0, Math.Min(100.0, pct));
+                            } else {
+                                pct = 0.0;
+                            }
+                        }
+                        txtCpu.Text = Math.Round(pct) + "%";
+                        txtCpu.Foreground = pct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : pct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
+
+                        // 2. RAM Utilization
                         double totGb = 0, usedGb = 0;
                         MEMORYSTATUSEX mem = new MEMORYSTATUSEX();
                         if (GlobalMemoryStatusEx(mem)) {
@@ -314,18 +373,66 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                             txtRam.Foreground = rPct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : rPct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
                         }
 
-                        if (_hasNvml) {
-                            NvmlUtil ut;
-                            if (nvmlDeviceGetUtilizationRates(_nvmlDev, out ut) == 0) {
-                                txtGpu.Text = ut.gpu + "%";
-                                txtGpu.Foreground = ut.gpu >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : ut.gpu >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
-                            }
-                            uint temp;
-                            if (nvmlDeviceGetTemperature(_nvmlDev, 0, out temp) == 0 && temp > 0 && temp < 125) {
-                                txtGpuT.Text = temp + "\u00B0C";
-                                txtGpuT.Foreground = temp >= 85 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : temp >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
-                            }
+                        // 3. GPU Utilization (matches Task Manager across Intel, AMD, NVIDIA)
+                        double gpuPct = 0.0;
+                        if (_hasPdh && _hGpuCounter != IntPtr.Zero) {
+                            try {
+                                uint bufSize = 0, count = 0;
+                                PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, IntPtr.Zero);
+                                if (bufSize > 0) {
+                                    IntPtr pBuf = Marshal.AllocHGlobal((int)bufSize);
+                                    try {
+                                        if (PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, pBuf) == 0) {
+                                            Dictionary<int, double> pidMax = new Dictionary<int, double>();
+                                            for (int idx = 0; idx < count; idx++) {
+                                                IntPtr itemPtr = new IntPtr(pBuf.ToInt64() + idx * 24);
+                                                double val = (double)Marshal.PtrToStructure(new IntPtr(pBuf.ToInt64() + idx * 24 + 16), typeof(double));
+                                                if (val > 0.01) {
+                                                    IntPtr szName = Marshal.ReadIntPtr(itemPtr, 0);
+                                                    string name = Marshal.PtrToStringUni(szName);
+                                                    int pid = 0;
+                                                    if (name != null && name.StartsWith("pid_")) {
+                                                        int under = name.IndexOf('_', 4);
+                                                        if (under > 4) {
+                                                            int.TryParse(name.Substring(4, under - 4), out pid);
+                                                        }
+                                                    }
+                                                    if (pidMax.ContainsKey(pid)) {
+                                                        if (val > pidMax[pid]) pidMax[pid] = val;
+                                                    } else {
+                                                        pidMax[pid] = val;
+                                                    }
+                                                }
+                                            }
+                                            double sumPdh = 0.0;
+                                            foreach (double v in pidMax.Values) { sumPdh += v; }
+                                            gpuPct = Math.Max(gpuPct, sumPdh);
+                                        }
+                                    } finally {
+                                        Marshal.FreeHGlobal(pBuf);
+                                    }
+                                }
+                            } catch {}
                         }
+
+                        // NVML (Discrete NVIDIA utilization and temperature)
+                        if (_hasNvml) {
+                            try {
+                                NvmlUtil ut;
+                                if (nvmlDeviceGetUtilizationRates(_nvmlDev, out ut) == 0) {
+                                    gpuPct = Math.Max(gpuPct, (double)ut.gpu);
+                                }
+                                uint temp;
+                                if (nvmlDeviceGetTemperature(_nvmlDev, 0, out temp) == 0 && temp > 0 && temp < 125) {
+                                    txtGpuT.Text = temp + "\u00B0C";
+                                    txtGpuT.Foreground = temp >= 85 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : temp >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
+                                }
+                            } catch {}
+                        }
+
+                        gpuPct = Math.Max(0.0, Math.Min(100.0, gpuPct));
+                        txtGpu.Text = Math.Round(gpuPct) + "%";
+                        txtGpu.Foreground = gpuPct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : gpuPct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
 
                         // Smart Auto-Detection: CPU Temperature
                         double? cpuT = QueryCpuTemp();

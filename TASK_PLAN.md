@@ -248,3 +248,7 @@ Status Indicators:
   - *Description*: Build automated release packager creating self-contained 1.65 MB zip archive (`dist/Win11TaskbarMonitor-Setup.zip`) with 1-click `Install.cmd`, `Install-Admin.cmd`, `Run-Portable.cmd`, and `Uninstall.cmd` that install on any clean Windows 11/10 machine with zero prerequisites.
   - *Expected Outcome*: Fully portable, zero-dependency release package.
   - *Verification Requirements*: Tested standalone package extraction and clean 1-click install execution.
+- [x] **Task 12.7: Real-Time Synchronization with Windows Task Manager (CPU & GPU)**
+  - *Description*: Diagnose and fix metric synchronization discrepancy with Windows Task Manager. Switch CPU from legacy unscaled `GetSystemTimes` to PDH `\Processor Information(_Total)\% Processor Utility` (matching Task Manager's turbo/frequency scaling). Implement multi-GPU WDDM engine aggregation via PDH `\GPU Engine(*)\Utilization Percentage` across all active graphics adapters (Intel, AMD, NVIDIA) so desktop usage on integrated GPUs does not report 0%. Retain NVML for hardware thermals and CUDA loads.
+  - *Expected Outcome*: Real-time 1:1 metric alignment between taskbar widget and Windows Task Manager.
+  - *Verification Requirements*: Verified live PDH sampling matching Task Manager across both CPU and GPU.

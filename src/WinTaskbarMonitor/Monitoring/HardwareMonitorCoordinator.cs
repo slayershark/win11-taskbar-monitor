@@ -144,6 +144,7 @@ public sealed class HardwareMonitorCoordinator : IDisposable
     public void Dispose()
     {
         Stop();
+        _cpuProvider.Dispose();
         _gpuProvider.Dispose();
         _cpuTempProvider.Dispose();
     }

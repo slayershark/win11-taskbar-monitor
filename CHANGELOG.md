@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.1.4] - 2026-11-15
+
+### Fixed
+- **Real-Time Synchronization with Windows Task Manager**:
+  - **CPU Metric Parity**: Switched CPU metric from legacy unscaled `GetSystemTimes` (`% Processor Time`) to Windows Performance Data Helper (`\Processor Information(_Total)\% Processor Utility`), matching Windows Task Manager's exact frequency-scaled processor utility with defensive fallback.
+  - **Multi-GPU Dynamic Engine Aggregation**: Resolved dual-GPU discrepancy where integrated GPUs (e.g. Intel Iris Xe / AMD Radeon) handling active desktop rendering showed 0% GPU usage because only idling discrete NVIDIA cards were queried. Implemented real-time WDDM engine aggregation via PDH `\GPU Engine(*)\Utilization Percentage` across all active applications and GPUs.
+  - **Preserved Hardware Thermals**: Retained direct NVML driver queries for discrete NVIDIA GPU temperature and heavy CUDA/3D load.
+  - **Full Codebase Parity**: Updated both the lightweight runner `scripts/LiveDaemon.cs` and compiled engine classes (`CpuMonitorProvider.cs`, `GpuMonitorProvider.cs`, and `HardwareMonitorCoordinator.cs`).
+  - **Universal Distribution Refreshed**: Recompiled `dist/Win11TaskbarMonitor.exe` and rebuilt `dist/Win11TaskbarMonitor-Setup.zip` with the real-time synchronization engine.
+
+---
+
 ## [1.1.3] - 2026-11-15
 
 ### Changed
