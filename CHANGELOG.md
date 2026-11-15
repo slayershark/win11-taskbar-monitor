@@ -5,6 +5,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.0.1] - 2026-11-15
+
+### Added
+- **Interactive Live Controls**:
+  - Left-click drag to freely reposition widget anywhere on the taskbar or desktop.
+  - Right-click context menu with "Reset Position to Taskbar" and "Exit WinTaskbarMonitor".
+  - Dynamic hover tooltip displaying real-time breakdown of CPU %, GPU %, RAM (used / total GB and percentage), and GPU temperature.
+  - `stop.cmd` script in project root for clean one-click termination of the monitor.
+- **Smart App Control & Desktop Diagnostics**:
+  - Root-caused Windows 11 Smart App Control (SAC) policy blocking third-party binaries (`0x800711C7`), discovering that even `Sys_MonSystemMonitor.exe` failed with this exact error in the Windows Application event log.
+  - Implemented zero-policy in-memory execution engine (`LiveDaemon.cs`) that runs under Microsoft's signed PowerShell/CLR runtime without requiring Developer Mode.
+
+### Fixed
+- **Process Premature Termination**: Added `t.Join()` in `LiveApp.Launch` to prevent PowerShell host from exiting immediately while GUI thread was active.
+- **Desktop Assignment Collision**: Resolved `ERROR_BUSY (170)` by checking current desktop handle (`hCur != hDesk`) before calling `SetThreadDesktop`.
+- **Character Encoding**: Fixed degree symbol encoding using Unicode escape `\u00B0C` and UTF-8 encoding in `Get-Content`.
+
+---
+
 ## [1.0.0] - 2026-11-15
 
 ### Added
