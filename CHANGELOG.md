@@ -31,7 +31,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - `SettingsService`: Auto-saves configuration to `%APPDATA%\WinTaskbarMonitor\settings.json` with recovery from corrupted files.
   - "Start with Windows" toggle via non-elevated `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
   - Single-instance enforcement via named system mutex (`WinTaskbarMonitor_SingleInstance_Mutex`).
-- **Packaging & Testing**:
+- **Packaging, Distribution & Installation**:
   - Compiled and published standalone single-file x64 executable to `dist/WinTaskbarMonitor.exe` (3.70 MB).
-  - Test suite in `tests/WinTaskbarMonitor.Tests` covering monitoring providers and settings serialization.
+  - Created automated installation scripts (`scripts/install.ps1`, `install.cmd`) deploying to `%LOCALAPPDATA%\Programs\WinTaskbarMonitor`.
+  - Added Windows Start Menu shortcut creation and registration in Windows **Settings > Apps > Installed apps** (Add or Remove Programs).
+  - Created clean uninstaller (`scripts/uninstall.ps1`, `uninstall.cmd`) removing binaries, shortcuts, and registry entries.
+  - Test suite in `tests/WinTaskbarMonitor.Tests` and automated runner in `tests/run_tests.ps1`.
   - Complete project documentation suite: `AGENTS.md`, `PROJECT_BRIEF.md`, `ARCHITECTURE.md`, `TASK_PLAN.md`, `CONTEXT.md`, `CHANGELOG.md`, `TEST_PLAN.md`, `README.md`.

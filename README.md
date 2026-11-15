@@ -45,6 +45,26 @@ This project follows a strict **Documentation-First Workflow**:
 
 ---
 
+## Installation & Removal
+
+### Quick Install (One-Click)
+- **Option 1**: Double-click [install.cmd](install.cmd) in the project root.
+- **Option 2**: Run PowerShell:
+  ```powershell
+  .\scripts\install.ps1 -CreateDesktopShortcut -StartWithWindows
+  ```
+
+This cleanly installs WinTaskbarMonitor to `%LOCALAPPDATA%\Programs\WinTaskbarMonitor`, creates a Windows Start Menu shortcut, and registers the application in Windows **Installed Apps / Add or Remove Programs**.
+
+### Uninstallation
+- **Via Windows Settings**: Open Windows **Settings > Apps > Installed apps**, search for **WinTaskbarMonitor**, and click **Uninstall**.
+- **Via Script**: Double-click [uninstall.cmd](uninstall.cmd) or run:
+  ```powershell
+  .\scripts\uninstall.ps1
+  ```
+
+---
+
 ## Prerequisites & Building
 
 - **Operating System**: Windows 11 (64-bit)
