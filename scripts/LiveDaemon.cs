@@ -102,13 +102,18 @@ namespace WinTaskbarMonitor.LiveDaemon {
                 }
             } catch {}
 
-            Thread t = new Thread(() => {
+            Thread t = new Thread(new ThreadStart(() => {
                 if (hDesk != IntPtr.Zero) {
                     IntPtr curDesk = GetThreadDesktop(GetCurrentThreadId());
                     if (curDesk != hDesk) {
                         SetThreadDesktop(hDesk);
                     }
                 }
+
+                // Crash-proof dispatcher
+                System.Windows.Threading.Dispatcher.CurrentDispatcher.UnhandledException += (s, e) => {
+                    e.Handled = true;
+                };
 
                 Window win = new Window();
                 win.Title = "WinTaskbarMonitor";
@@ -160,26 +165,50 @@ namespace WinTaskbarMonitor.LiveDaemon {
                 border.Child = stack;
                 win.Content = border;
 
-                // Dragging support
+                // Defensive drag move
                 win.MouseLeftButtonDown += (s, e) => {
-                    if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) {
-                        win.DragMove();
-                    }
+                    try {
+                        if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) {
+                            win.DragMove();
+                        }
+                    } catch {}
                 };
 
                 // Context Menu for user control
                 ContextMenu menu = new ContextMenu();
-                MenuItem itemReset = new MenuItem { Header = "Reset Position to Taskbar" };
+                MenuItem posMenu = new MenuItem { Header = "Quick Position" };
+                
+                MenuItem posTaskbar = new MenuItem { Header = "Dock On Taskbar (Default)" };
+                posTaskbar.Click += (s, e) => { win.Left = defaultX; win.Top = defaultY; };
+
+                MenuItem posAbove = new MenuItem { Header = "Above Taskbar (Floating Dock)" };
+                posAbove.Click += (s, e) => { win.Left = defaultX; win.Top = rTray.Top - 40; };
+
+                MenuItem posLeft = new MenuItem { Header = "Left of Taskbar (Sys_Mon style)" };
+                posLeft.Click += (s, e) => { win.Left = 10; win.Top = defaultY; };
+
+                MenuItem posTopRight = new MenuItem { Header = "Top Right of Screen" };
+                posTopRight.Click += (s, e) => { win.Left = 1650; win.Top = 10; };
+
+                posMenu.Items.Add(posTaskbar);
+                posMenu.Items.Add(posAbove);
+                posMenu.Items.Add(posLeft);
+                posMenu.Items.Add(posTopRight);
+
+                MenuItem itemReset = new MenuItem { Header = "Reset Position" };
                 itemReset.Click += (s, e) => {
                     win.Left = defaultX;
                     win.Top = defaultY;
                 };
+
                 MenuItem itemExit = new MenuItem { Header = "Exit WinTaskbarMonitor" };
                 itemExit.Click += (s, e) => {
                     win.Close();
                     System.Windows.Threading.Dispatcher.ExitAllFrames();
                     Environment.Exit(0);
                 };
+
+                menu.Items.Add(posMenu);
                 menu.Items.Add(itemReset);
                 menu.Items.Add(new Separator());
                 menu.Items.Add(itemExit);
@@ -188,6 +217,8 @@ namespace WinTaskbarMonitor.LiveDaemon {
                 ToolTip tt = new ToolTip();
                 tt.Content = "WinTaskbarMonitor\n• Left-click + drag to reposition\n• Right-click for options";
                 win.ToolTip = tt;
+
+                IntPtr mainHwnd = IntPtr.Zero;
 
                 DispatcherTimer timer = new DispatcherTimer();
                 timer.Interval = TimeSpan.FromSeconds(1);
@@ -233,14 +264,19 @@ namespace WinTaskbarMonitor.LiveDaemon {
                         tt.Content = string.Format(
                             "WinTaskbarMonitor\n-------------------------\nCPU: {0}\nGPU: {1}\nRAM: {2:F1} / {3:F1} GB ({4})\nGPU Temp: {5}\nCPU Temp: N/A\n-------------------------\n• Left-click & drag to move\n• Right-click for options",
                             txtCpu.Text, gpuInfo, usedGb, totGb, txtRam.Text, gpuTempInfo);
+
+                        // Periodically assert TOPMOST so Explorer/taskbar never obscures it
+                        if (mainHwnd != IntPtr.Zero) {
+                            SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
+                        }
                     } catch {}
                 };
 
                 win.Loaded += (s, e) => {
-                    IntPtr hwnd = new WindowInteropHelper(win).Handle;
-                    int style = GetWindowLong(hwnd, -20);
-                    SetWindowLong(hwnd, -20, style | 0x08000080);
-                    SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0020);
+                    mainHwnd = new WindowInteropHelper(win).Handle;
+                    int style = GetWindowLong(mainHwnd, -20);
+                    SetWindowLong(mainHwnd, -20, style | 0x08000080);
+                    SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0040);
                     timer.Start();
 
                     if (!string.IsNullOrEmpty(capPath)) {
@@ -263,7 +299,7 @@ namespace WinTaskbarMonitor.LiveDaemon {
 
                 win.Show();
                 System.Windows.Threading.Dispatcher.Run();
-            });
+            }));
 
             t.SetApartmentState(ApartmentState.STA);
             t.IsBackground = false;
