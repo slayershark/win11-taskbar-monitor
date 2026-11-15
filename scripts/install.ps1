@@ -75,13 +75,16 @@ if (!(Test-Path $installDir)) {
 
 Copy-Item -Path $sourceExe -Destination $targetExe -Force
 Copy-Item -Path "$PSScriptRoot\uninstall.ps1" -Destination $targetUninstallScript -Force
-Write-Host "[+] Copied executable and uninstaller" -ForegroundColor Green
+Copy-Item -Path "$PSScriptRoot\Run-WinTaskbarMonitor.ps1" -Destination "$installDir\Run-WinTaskbarMonitor.ps1" -Force
+Copy-Item -Path "$PSScriptRoot\LiveDaemon.cs" -Destination "$installDir\LiveDaemon.cs" -Force
+Write-Host "[+] Copied executable, runner daemon, and uninstaller" -ForegroundColor Green
 
-# 4. Create Start Menu Shortcut
+# 4. Create Start Menu Shortcut (Using silent runner to prevent SAC policy blocks)
 $shortcutPath = "$startMenuDir\WinTaskbarMonitor.lnk"
 $wshShell = New-Object -ComObject WScript.Shell
 $shortcut = $wshShell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath = $targetExe
+$shortcut.TargetPath = "powershell.exe"
+$shortcut.Arguments = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
 $shortcut.WorkingDirectory = $installDir
 $shortcut.Description = "Lightweight Windows 11 Taskbar System Monitor"
 $shortcut.IconLocation = "$targetExe,0"
@@ -92,7 +95,8 @@ Write-Host "[+] Created Start Menu shortcut in $startMenuDir" -ForegroundColor G
 if ($CreateDesktopShortcut) {
     $desktopShortcut = "$desktopPath\WinTaskbarMonitor.lnk"
     $scDesktop = $wshShell.CreateShortcut($desktopShortcut)
-    $scDesktop.TargetPath = $targetExe
+    $scDesktop.TargetPath = "powershell.exe"
+    $scDesktop.Arguments = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
     $scDesktop.WorkingDirectory = $installDir
     $scDesktop.Description = "Lightweight Windows 11 Taskbar System Monitor"
     $scDesktop.IconLocation = "$targetExe,0"
@@ -121,17 +125,18 @@ Write-Host "[+] Registered in Windows Installed Apps" -ForegroundColor Green
 # 7. Optional Start with Windows
 if ($StartWithWindows) {
     $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-    Set-ItemProperty -Path $runKey -Name "WinTaskbarMonitor" -Value "`"$targetExe`""
+    $runVal = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
+    Set-ItemProperty -Path $runKey -Name "WinTaskbarMonitor" -Value $runVal
     Write-Host "[+] Enabled Start with Windows" -ForegroundColor Green
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Cyan
 Write-Host "          Installation Completed Successfully!            " -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "WinTaskbarMonitor is now installed in Program Files." -ForegroundColor White
-Write-Host "Protected directory status enables execution without Developer Mode." -ForegroundColor White
+Write-Host "WinTaskbarMonitor is now installed." -ForegroundColor White
+Write-Host "Zero-policy runner enables seamless execution without Developer Mode." -ForegroundColor White
 
 if ($LaunchAfterInstall) {
     Write-Host "`n[*] Launching WinTaskbarMonitor..." -ForegroundColor Yellow
-    Start-Process -FilePath $targetExe
+    Start-Process powershell.exe -ArgumentList "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
 }

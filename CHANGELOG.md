@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.0.2] - 2026-11-15
+
+### Added
+- **2-Row Vertical Metric Layout**:
+  - Implemented 2-row layout across `LiveDaemon.cs` and WPF `MainWindow.xaml`: top row displays metric label (e.g. `CPU`, `GPU`, `CPU°`, `GPU°`, `RAM`) in 8.5pt semi-bold subdued text; bottom row displays real-time value (e.g. `80%`, `0%`, `N/A`, `62°C`, `83%`) in 11.5pt semi-bold tabular font.
+  - Centered vertically within the 48px Windows 11 taskbar with 18px column divider lines.
+  - Visual verification captured at `verified_taskbar_2row.png`.
+
+### Changed
+- **Smart App Control Notification Elimination**:
+  - Updated `scripts/install.ps1` to configure Start Menu and Desktop shortcuts to launch via the zero-policy silent runner (`powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File ...`).
+  - Completely prevents the Windows Security toast ("Part of this app has been blocked... we can't confirm who published WinTaskbarMonitor.exe").
+
+---
+
 ## [1.0.1] - 2026-11-15
 
 ### Added

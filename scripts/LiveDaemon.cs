@@ -126,7 +126,7 @@ namespace WinTaskbarMonitor.LiveDaemon {
                 if (tray != IntPtr.Zero) { GetWindowRect(tray, out rTray); }
 
                 int defaultX = posX > 0 ? posX : 1220;
-                int defaultY = rTray.Top + (rTray.Bottom - rTray.Top - 34) / 2;
+                int defaultY = rTray.Top + (rTray.Bottom - rTray.Top - 36) / 2;
                 win.Left = defaultX;
                 win.Top = defaultY;
 
@@ -135,25 +135,25 @@ namespace WinTaskbarMonitor.LiveDaemon {
                 border.BorderThickness = new Thickness(1);
                 border.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 24, 24, 24));
                 border.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(70, 255, 255, 255));
-                border.Padding = new Thickness(8, 4, 8, 4);
+                border.Padding = new Thickness(7, 2, 7, 2);
 
                 StackPanel stack = new StackPanel();
                 stack.Orientation = Orientation.Horizontal;
                 stack.VerticalAlignment = VerticalAlignment.Center;
 
-                TextBlock txtCpu = new TextBlock { Text = "0%", FontSize = 11.5, MinWidth = 28, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
-                TextBlock txtGpu = new TextBlock { Text = "0%", FontSize = 11.5, MinWidth = 28, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
-                TextBlock txtCpuT = new TextBlock { Text = "N/A", FontSize = 11.5, MinWidth = 34, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)) };
-                TextBlock txtGpuT = new TextBlock { Text = "N/A", FontSize = 11.5, MinWidth = 34, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)) };
-                TextBlock txtRam = new TextBlock { Text = "0%", FontSize = 11.5, MinWidth = 32, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                TextBlock txtCpu = new TextBlock { Text = "0%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 30, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                TextBlock txtGpu = new TextBlock { Text = "0%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 30, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                TextBlock txtCpuT = new TextBlock { Text = "N/A", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 34, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)) };
+                TextBlock txtGpuT = new TextBlock { Text = "N/A", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 34, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)) };
+                TextBlock txtRam = new TextBlock { Text = "0%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 30, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
 
                 stack.Children.Add(CreateItem("CPU", txtCpu));
                 stack.Children.Add(CreateSep());
                 stack.Children.Add(CreateItem("GPU", txtGpu));
                 stack.Children.Add(CreateSep());
-                stack.Children.Add(CreateItem("CPU", txtCpuT));
+                stack.Children.Add(CreateItem("CPU\u00B0", txtCpuT));
                 stack.Children.Add(CreateSep());
-                stack.Children.Add(CreateItem("GPU", txtGpuT));
+                stack.Children.Add(CreateItem("GPU\u00B0", txtGpuT));
                 stack.Children.Add(CreateSep());
                 stack.Children.Add(CreateItem("RAM", txtRam));
 
@@ -272,14 +272,37 @@ namespace WinTaskbarMonitor.LiveDaemon {
         }
 
         private static StackPanel CreateItem(string label, TextBlock valBlock) {
-            StackPanel p = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3, 0, 3, 0) };
-            p.Children.Add(new TextBlock { Text = label, FontSize = 9.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) });
+            StackPanel p = new StackPanel { 
+                Orientation = Orientation.Vertical, 
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center, 
+                Margin = new Thickness(3, 0, 3, 0),
+                MinWidth = 30
+            };
+            TextBlock lbl = new TextBlock { 
+                Text = label, 
+                FontSize = 8.5, 
+                FontWeight = FontWeights.SemiBold, 
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)), 
+                HorizontalAlignment = HorizontalAlignment.Center, 
+                TextAlignment = TextAlignment.Center, 
+                Margin = new Thickness(0, 0, 0, 1) 
+            };
+            valBlock.HorizontalAlignment = HorizontalAlignment.Center;
+            valBlock.TextAlignment = TextAlignment.Center;
+            p.Children.Add(lbl);
             p.Children.Add(valBlock);
             return p;
         }
 
         private static System.Windows.Shapes.Rectangle CreateSep() {
-            return new System.Windows.Shapes.Rectangle { Width = 1, Height = 14, Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(50, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 6, 0) };
+            return new System.Windows.Shapes.Rectangle { 
+                Width = 1, 
+                Height = 18, 
+                Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 255, 255, 255)), 
+                VerticalAlignment = VerticalAlignment.Center, 
+                Margin = new Thickness(4, 0, 4, 0) 
+            };
         }
     }
 }

@@ -23,32 +23,36 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
         <Style x:Key="MetricLabelStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="9.5" />
+            <Setter Property="FontSize" Value="8.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{Binding Theme.TextSubtleBrush}" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Margin" Value="0,0,4,0" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,0,1" />
         </Style>
 
         <Style x:Key="MetricValueStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="{Binding FontSize}" />
-            <Setter Property="FontWeight" Value="Normal" />
-            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
         </Style>
 
         <Style x:Key="SeparatorStyle" TargetType="Rectangle">
             <Setter Property="Width" Value="1" />
-            <Setter Property="Height" Value="14" />
+            <Setter Property="Height" Value="18" />
             <Setter Property="Fill" Value="{Binding Theme.SeparatorBrush}" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Margin" Value="7,0,7,0" />
+            <Setter Property="Margin" Value="4,0,4,0" />
         </Style>
 
         <Style x:Key="MetricContainerStyle" TargetType="StackPanel">
-            <Setter Property="Orientation" Value="Horizontal" />
+            <Setter Property="Orientation" Value="Vertical" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Margin" Value="3,0,3,0" />
+            <Setter Property="MinWidth" Value="30" />
             <Setter Property="Background" Value="Transparent" />
         </Style>
     </Window.Resources>
@@ -57,7 +61,7 @@
             BorderThickness="1"
             Background="{Binding Theme.BackgroundBrush}"
             BorderBrush="{Binding Theme.BorderBrush}"
-            Padding="6,3,6,3"
+            Padding="7,2,7,2"
             SnapsToDevicePixels="True">
 
         <Border.ContextMenu>
@@ -94,7 +98,7 @@
                            Foreground="{Binding CpuBrush}"
                            Style="{StaticResource MetricValueStyle}"
                            MinWidth="28"
-                           TextAlignment="Right" />
+                           TextAlignment="Center" />
             </StackPanel>
 
             <Rectangle Style="{StaticResource SeparatorStyle}"
@@ -109,7 +113,7 @@
                            Foreground="{Binding GpuBrush}"
                            Style="{StaticResource MetricValueStyle}"
                            MinWidth="28"
-                           TextAlignment="Right" />
+                           TextAlignment="Center" />
             </StackPanel>
 
             <Rectangle Style="{StaticResource SeparatorStyle}"
@@ -119,12 +123,12 @@
             <StackPanel Style="{StaticResource MetricContainerStyle}"
                         Visibility="{Binding ShowCpuTemp, Converter={StaticResource BoolToVis}}"
                         ToolTip="{Binding CpuTempTooltip}">
-                <TextBlock Text="CPU" Style="{StaticResource MetricLabelStyle}" />
+                <TextBlock Text="CPU°" Style="{StaticResource MetricLabelStyle}" />
                 <TextBlock Text="{Binding CpuTempValue}"
                            Foreground="{Binding CpuTempBrush}"
                            Style="{StaticResource MetricValueStyle}"
-                           MinWidth="36"
-                           TextAlignment="Right" />
+                           MinWidth="34"
+                           TextAlignment="Center" />
             </StackPanel>
 
             <Rectangle Style="{StaticResource SeparatorStyle}"
@@ -134,12 +138,12 @@
             <StackPanel Style="{StaticResource MetricContainerStyle}"
                         Visibility="{Binding ShowGpuTemp, Converter={StaticResource BoolToVis}}"
                         ToolTip="{Binding GpuTempTooltip}">
-                <TextBlock Text="GPU" Style="{StaticResource MetricLabelStyle}" />
+                <TextBlock Text="GPU°" Style="{StaticResource MetricLabelStyle}" />
                 <TextBlock Text="{Binding GpuTempValue}"
                            Foreground="{Binding GpuTempBrush}"
                            Style="{StaticResource MetricValueStyle}"
-                           MinWidth="36"
-                           TextAlignment="Right" />
+                           MinWidth="34"
+                           TextAlignment="Center" />
             </StackPanel>
 
             <Rectangle Style="{StaticResource SeparatorStyle}"
@@ -153,8 +157,8 @@
                 <TextBlock Text="{Binding RamValue}"
                            Foreground="{Binding RamBrush}"
                            Style="{StaticResource MetricValueStyle}"
-                           MinWidth="32"
-                           TextAlignment="Right" />
+                           MinWidth="30"
+                           TextAlignment="Center" />
             </StackPanel>
         </StackPanel>
     </Border>
