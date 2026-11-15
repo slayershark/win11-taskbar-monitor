@@ -21,7 +21,7 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `f15e662` (feat: complete universal distribution package and zip installer for any Windows machine)
+  - Latest Commit: `b87628c` (fix: initialize PDH queries on STA thread and enforce explicit struct layout for realtime sync)
 
 ---
 
