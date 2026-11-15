@@ -21,7 +21,7 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `b87628c` (fix: initialize PDH queries on STA thread and enforce explicit struct layout for realtime sync)
+  - Latest Commit: `a939b17` (fix: resolve Unicode PDH GPU engine parsing and align real-time metrics with Task Manager)
 
 ---
 
