@@ -21,7 +21,7 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `356844a` (feat: add native zero-policy desktop runner and launcher)
+  - Latest Commit: `25777a3` (fix: ensure persistent live daemon, add drag/context menu, and handle desktop binding)
 
 ---
 
