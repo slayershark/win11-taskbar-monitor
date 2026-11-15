@@ -21,7 +21,7 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `b30f2fd` (feat: add one-click installer, uninstaller, and Start Menu integration)
+  - Latest Commit: `ce28b31` (feat: support Program Files system-wide install to run without Developer Mode)
 
 ---
 
