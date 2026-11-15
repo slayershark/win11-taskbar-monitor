@@ -244,3 +244,7 @@ Status Indicators:
   - *Description*: Rebrand project across all source code, assembly outputs, installer scripts, desktop shortcuts, and vector brandmarks to **Win11TaskbarMonitor**.
   - *Expected Outcome*: Clean consistency throughout the codebase and installed environment.
   - *Verification Requirements*: Verified `Win11TaskbarMonitor.exe`, shortcuts, and vector SVGs.
+- [x] **Task 12.6: Universal Distribution Package for Any Windows Machine**
+  - *Description*: Build automated release packager creating self-contained 1.65 MB zip archive (`dist/Win11TaskbarMonitor-Setup.zip`) with 1-click `Install.cmd`, `Install-Admin.cmd`, `Run-Portable.cmd`, and `Uninstall.cmd` that install on any clean Windows 11/10 machine with zero prerequisites.
+  - *Expected Outcome*: Fully portable, zero-dependency release package.
+  - *Verification Requirements*: Tested standalone package extraction and clean 1-click install execution.

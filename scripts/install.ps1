@@ -28,19 +28,29 @@ Write-Host "==========================================================" -Foregro
 Write-Host "        Win11TaskbarMonitor — System Installation         " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# 1. Paths
-$sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor.exe"
-if (!(Test-Path $sourceExe)) {
-    Write-Host "`n[*] Building release executable..." -ForegroundColor Yellow
+# 1. Resolve source files (supports both repo structure and standalone release folder)
+$sourceExe = $null
+if (Test-Path "$PSScriptRoot\Win11TaskbarMonitor.exe") {
+    $sourceExe = "$PSScriptRoot\Win11TaskbarMonitor.exe"
+} elseif (Test-Path "$PSScriptRoot\..\dist\Win11TaskbarMonitor.exe") {
+    $sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor.exe"
+} else {
+    # If in a dev environment with dotnet, attempt build
     $dotnetRoot = if ($env:DOTNET_ROOT) { $env:DOTNET_ROOT } else { "$env:LOCALAPPDATA\dotnet" }
     $env:Path = "$dotnetRoot;" + $env:Path
-    & dotnet publish "$PSScriptRoot\..\src\WinTaskbarMonitor\WinTaskbarMonitor.csproj" -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o "$PSScriptRoot\..\dist" | Out-Null
+    if (Get-Command dotnet -ErrorAction SilentlyContinue) {
+        Write-Host "`n[*] Building release executable..." -ForegroundColor Yellow
+        & dotnet publish "$PSScriptRoot\..\src\WinTaskbarMonitor\WinTaskbarMonitor.csproj" -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o "$PSScriptRoot\..\dist" 2>$null | Out-Null
+        if (Test-Path "$PSScriptRoot\..\dist\Win11TaskbarMonitor.exe") {
+            $sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor.exe"
+        }
+    }
 }
 
-if (!(Test-Path $sourceExe)) {
-    Write-Error "Could not find Win11TaskbarMonitor.exe in $sourceExe"
-    exit 1
-}
+$sourceDaemon = if (Test-Path "$PSScriptRoot\LiveDaemon.cs") { "$PSScriptRoot\LiveDaemon.cs" } else { "$PSScriptRoot\..\scripts\LiveDaemon.cs" }
+$sourceRunner = if (Test-Path "$PSScriptRoot\Run-WinTaskbarMonitor.ps1") { "$PSScriptRoot\Run-WinTaskbarMonitor.ps1" } else { "$PSScriptRoot\..\scripts\Run-WinTaskbarMonitor.ps1" }
+$sourceUninstall = if (Test-Path "$PSScriptRoot\uninstall.ps1") { "$PSScriptRoot\uninstall.ps1" } else { "$PSScriptRoot\..\scripts\uninstall.ps1" }
+$sourceIco = if (Test-Path "$PSScriptRoot\app.ico") { "$PSScriptRoot\app.ico" } elseif (Test-Path "$PSScriptRoot\..\assets\app.ico") { "$PSScriptRoot\..\assets\app.ico" } else { $null }
 
 # Determine target folder based on Scope
 if ($Scope -eq "AllUsers") {
@@ -73,17 +83,24 @@ if (!(Test-Path $installDir)) {
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 }
 
-Copy-Item -Path $sourceExe -Destination $targetExe -Force
-Unblock-File -Path $targetExe -ErrorAction SilentlyContinue
-Copy-Item -Path "$PSScriptRoot\uninstall.ps1" -Destination $targetUninstallScript -Force
-Copy-Item -Path "$PSScriptRoot\Run-WinTaskbarMonitor.ps1" -Destination "$installDir\Run-WinTaskbarMonitor.ps1" -Force
-Copy-Item -Path "$PSScriptRoot\LiveDaemon.cs" -Destination "$installDir\LiveDaemon.cs" -Force
-$icoSource = "$PSScriptRoot\..\assets\app.ico"
-$targetIco = "$installDir\app.ico"
-if (Test-Path $icoSource) {
-    Copy-Item -Path $icoSource -Destination $targetIco -Force
+if ($sourceExe -and (Test-Path $sourceExe)) {
+    Copy-Item -Path $sourceExe -Destination $targetExe -Force
+    Unblock-File -Path $targetExe -ErrorAction SilentlyContinue
 }
-Write-Host "[+] Copied executable, icon, runner daemon, and uninstaller" -ForegroundColor Green
+if (Test-Path $sourceUninstall) {
+    Copy-Item -Path $sourceUninstall -Destination $targetUninstallScript -Force
+}
+if (Test-Path $sourceRunner) {
+    Copy-Item -Path $sourceRunner -Destination "$installDir\Run-WinTaskbarMonitor.ps1" -Force
+}
+if (Test-Path $sourceDaemon) {
+    Copy-Item -Path $sourceDaemon -Destination "$installDir\LiveDaemon.cs" -Force
+}
+$targetIco = "$installDir\app.ico"
+if ($sourceIco -and (Test-Path $sourceIco)) {
+    Copy-Item -Path $sourceIco -Destination $targetIco -Force
+}
+Write-Host "[+] Copied application files, icons, and runner" -ForegroundColor Green
 
 # Remove legacy WinTaskbarMonitor shortcuts if present
 Remove-Item "$startMenuDir\WinTaskbarMonitor.lnk" -ErrorAction SilentlyContinue

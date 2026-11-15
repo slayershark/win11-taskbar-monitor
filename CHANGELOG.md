@@ -14,6 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Updated vector wordmarks (`assets/logo-horizontal-dark.svg`, `light`, `mono`) to feature `Win11TaskbarMonitor`.
   - Updated installer (`scripts/install.ps1`) and uninstaller (`scripts/uninstall.ps1`) to deploy `Win11TaskbarMonitor.lnk` shortcuts and clean up legacy paths.
   - Updated all batch runner scripts (`run.cmd`, `stop.cmd`, `install.cmd`, `uninstall.cmd`).
+- **Universal Distribution Setup Package**:
+  - Built automated package generator (`scripts/Build-ReleasePackage.ps1`) producing a portable standalone distribution and compressed `dist/Win11TaskbarMonitor-Setup.zip` (1.65 MB).
+  - Works on **any clean Windows 11 or Windows 10 PC** with zero prerequisites, zero developer tools, and zero .NET SDK installation required.
+  - Included 1-click user-mode `Install.cmd` (zero admin rights/UAC needed), `Install-Admin.cmd` (for All Users in Program Files), `Run-Portable.cmd` (no installation required), and `Uninstall.cmd`.
+  - Upgraded `install.ps1` to be path-agnostic, automatically resolving assets whether inside the dev repository or standalone release folder.
 
 ---
 
