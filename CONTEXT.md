@@ -27,6 +27,8 @@
 
 ## 3. Completed Features
 
+- [x] **Smart Auto-Detection for CPU Temp**: Dynamically probes hardware capabilities; reveals `CPU°` on supported ACPI desktop motherboards or elevated sessions, and automatically collapses on unprivileged laptops without showing `N/A`.
+- [x] **Smart Margin Detection Engine**: Dynamically measures taskbar bounds and actual rendered widget height, calculating exact equal margins on the top, bottom, and left across all DPI scales and taskbar height variations.
 - [x] **Brand Identity System**: Custom-designed "Telemetry W & Taskbar Horizon" vector identity, multi-res Windows `app.ico` (16–256px), 8 high-DPI raster assets, and full branding across XAML views and installer.
 - [x] **Smart App Control (SAC) Mitigation**: Zero-policy PowerShell host runner configured in shortcuts and installer, eliminating Smart App Control blocking prompts without requiring Developer Mode.
 - [x] **Left-Fixed Taskbar Layout**: Anchored to the far-left taskbar with exact equal 6px margins on top, bottom, and left (`X = 6, Y = 1038, Height = 36`).

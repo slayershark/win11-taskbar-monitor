@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.1.2] - 2026-11-15
+
+### Added
+- **Smart Auto-Detection for CPU Temperature**:
+  - Dynamically probes sensor channels (WMI ACPI `MSAcpi_ThermalZoneTemperature` and `LibreHardwareMonitorLib`).
+  - Seamlessly expands to show `CPU°` with its separator when a valid reading is detected (e.g. on supported ACPI desktop motherboards or elevated sessions).
+  - Automatically collapses the column when unsupported, completely eliminating `N/A` readouts and empty dividers.
+- **Smart Margin Detection Engine**:
+  - Measures live taskbar dimensions (`rTray`) and actual rendered widget content height (`contentH`).
+  - Dynamically computes `smartMargin = Math.Max(2, (taskbarHeight - contentH) / 2)` across any DPI scale (100%, 125%, 150%, 200%).
+  - Anchors the widget at `Left = rTray.Left + smartMargin` and `Top = rTray.Top + smartMargin`, guaranteeing exact equal margins on the top, bottom, and left.
+  - Implements dynamic self-healing if taskbar dimensions, screen resolution, or DPI change.
+
+---
+
 ## [1.1.0] - 2026-11-15
 
 ### Added

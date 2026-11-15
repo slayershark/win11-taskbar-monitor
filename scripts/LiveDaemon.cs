@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using System.Management;
 
 namespace WinTaskbarMonitor.LiveDaemon {
     public class LiveApp {
@@ -87,6 +88,26 @@ namespace WinTaskbarMonitor.LiveDaemon {
         private static IntPtr _nvmlDev = IntPtr.Zero;
         private static bool _hasNvml = false;
 
+        private static double? QueryCpuTemp() {
+            try {
+                using (var searcher = new ManagementObjectSearcher(@"root\WMI", "SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature")) {
+                    using (var coll = searcher.Get()) {
+                        foreach (ManagementObject mo in coll) {
+                            object val = mo["CurrentTemperature"];
+                            if (val != null && val is uint) {
+                                uint raw = (uint)val;
+                                if (raw > 0) {
+                                    double c = (raw / 10.0) - 273.15;
+                                    if (c > 15.0 && c < 115.0) return c;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch {}
+            return null;
+        }
+
         public static void Launch(int posX, string capPath) {
             IntPtr hDesk = OpenDesktop("Default", 0, false, 0x01FF);
             GetSystemTimes(out _pIdle, out _pKernel, out _pUser);
@@ -132,10 +153,10 @@ namespace WinTaskbarMonitor.LiveDaemon {
 
                 int trayH = rTray.Bottom - rTray.Top;
                 int widgetH = 36;
-                int margin = Math.Max(4, (trayH - widgetH) / 2);
+                int initialMargin = Math.Max(2, (trayH - widgetH) / 2);
 
-                int defaultX = posX > 0 ? posX : (rTray.Left + margin);
-                int defaultY = rTray.Top + margin;
+                int defaultX = posX > 0 ? posX : (rTray.Left + initialMargin);
+                int defaultY = rTray.Top + initialMargin;
                 win.Left = defaultX;
                 win.Top = defaultY;
 
@@ -151,11 +172,19 @@ namespace WinTaskbarMonitor.LiveDaemon {
                 stack.VerticalAlignment = VerticalAlignment.Center;
 
                 TextBlock txtCpu = new TextBlock { Text = "0%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 30, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                TextBlock txtCpuT = new TextBlock { Text = "0\u00B0C", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 34, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                StackPanel pnlCpuT = CreateItem("CPU\u00B0", txtCpuT);
+                System.Windows.Shapes.Rectangle sepCpuT = CreateSep();
+                pnlCpuT.Visibility = Visibility.Collapsed;
+                sepCpuT.Visibility = Visibility.Collapsed;
+
                 TextBlock txtGpu = new TextBlock { Text = "0%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 30, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
                 TextBlock txtGpuT = new TextBlock { Text = "N/A", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 34, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)) };
                 TextBlock txtRam = new TextBlock { Text = "0%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 30, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
 
                 stack.Children.Add(CreateItem("CPU", txtCpu));
+                stack.Children.Add(sepCpuT);
+                stack.Children.Add(pnlCpuT);
                 stack.Children.Add(CreateSep());
                 stack.Children.Add(CreateItem("GPU", txtGpu));
                 stack.Children.Add(CreateSep());
@@ -187,14 +216,38 @@ namespace WinTaskbarMonitor.LiveDaemon {
 
                 MenuItem posMenu = new MenuItem { Header = "Quick Position" };
                 
-                MenuItem posLeft = new MenuItem { Header = "Left of Taskbar (Default - Equal Margin)" };
-                posLeft.Click += (s, e) => { win.Left = rTray.Left + margin; win.Top = rTray.Top + margin; };
+                MenuItem posLeft = new MenuItem { Header = "Left of Taskbar (Smart Equal Margin)" };
+                posLeft.Click += (s, e) => {
+                    IntPtr tHwnd = FindWindow("Shell_TrayWnd", null);
+                    RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
+                    if (tHwnd != IntPtr.Zero) { GetWindowRect(tHwnd, out rt); }
+                    border.UpdateLayout();
+                    double h = border.ActualHeight > 0 ? border.ActualHeight : 36.0;
+                    int sm = Math.Max(2, (int)Math.Round(((rt.Bottom - rt.Top) - h) / 2.0));
+                    win.Left = rt.Left + sm;
+                    win.Top = rt.Top + sm;
+                };
 
                 MenuItem posTray = new MenuItem { Header = "Right of Taskbar (Next to Tray)" };
-                posTray.Click += (s, e) => { win.Left = 1220; win.Top = rTray.Top + margin; };
+                posTray.Click += (s, e) => {
+                    IntPtr tHwnd = FindWindow("Shell_TrayWnd", null);
+                    RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
+                    if (tHwnd != IntPtr.Zero) { GetWindowRect(tHwnd, out rt); }
+                    border.UpdateLayout();
+                    double h = border.ActualHeight > 0 ? border.ActualHeight : 36.0;
+                    int sm = Math.Max(2, (int)Math.Round(((rt.Bottom - rt.Top) - h) / 2.0));
+                    win.Left = 1220;
+                    win.Top = rt.Top + sm;
+                };
 
                 MenuItem posAbove = new MenuItem { Header = "Above Taskbar (Floating Dock)" };
-                posAbove.Click += (s, e) => { win.Left = rTray.Left + margin; win.Top = rTray.Top - 40; };
+                posAbove.Click += (s, e) => {
+                    IntPtr tHwnd = FindWindow("Shell_TrayWnd", null);
+                    RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
+                    if (tHwnd != IntPtr.Zero) { GetWindowRect(tHwnd, out rt); }
+                    win.Left = rt.Left + 6;
+                    win.Top = rt.Top - 42;
+                };
 
                 MenuItem posTopRight = new MenuItem { Header = "Top Right of Screen" };
                 posTopRight.Click += (s, e) => { win.Left = 1650; win.Top = 10; };
@@ -204,10 +257,16 @@ namespace WinTaskbarMonitor.LiveDaemon {
                 posMenu.Items.Add(posAbove);
                 posMenu.Items.Add(posTopRight);
 
-                MenuItem itemReset = new MenuItem { Header = "Reset Position to Left" };
+                MenuItem itemReset = new MenuItem { Header = "Reset Position to Left (Smart Margin)" };
                 itemReset.Click += (s, e) => {
-                    win.Left = defaultX;
-                    win.Top = defaultY;
+                    IntPtr tHwnd = FindWindow("Shell_TrayWnd", null);
+                    RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
+                    if (tHwnd != IntPtr.Zero) { GetWindowRect(tHwnd, out rt); }
+                    border.UpdateLayout();
+                    double h = border.ActualHeight > 0 ? border.ActualHeight : 36.0;
+                    int sm = Math.Max(2, (int)Math.Round(((rt.Bottom - rt.Top) - h) / 2.0));
+                    win.Left = rt.Left + sm;
+                    win.Top = rt.Top + sm;
                 };
 
                 MenuItem itemExit = new MenuItem { Header = "Exit WinTaskbarMonitor" };
@@ -268,12 +327,48 @@ namespace WinTaskbarMonitor.LiveDaemon {
                             }
                         }
 
+                        // Smart Auto-Detection: CPU Temperature
+                        double? cpuT = QueryCpuTemp();
+                        if (cpuT.HasValue && cpuT.Value > 15 && cpuT.Value < 115) {
+                            txtCpuT.Text = Math.Round(cpuT.Value) + "\u00B0C";
+                            txtCpuT.Foreground = cpuT.Value >= 85 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : cpuT.Value >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
+                            if (pnlCpuT.Visibility != Visibility.Visible) {
+                                pnlCpuT.Visibility = Visibility.Visible;
+                                sepCpuT.Visibility = Visibility.Visible;
+                            }
+                        } else {
+                            if (pnlCpuT.Visibility != Visibility.Collapsed) {
+                                pnlCpuT.Visibility = Visibility.Collapsed;
+                                sepCpuT.Visibility = Visibility.Collapsed;
+                            }
+                        }
+
+                        // Smart Margin Detection: dynamically calculates equal margins on top, bottom, and left
+                        IntPtr curTray = FindWindow("Shell_TrayWnd", null);
+                        RECT rCurTray = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
+                        if (curTray != IntPtr.Zero) { GetWindowRect(curTray, out rCurTray); }
+                        int curTrayH = rCurTray.Bottom - rCurTray.Top;
+
+                        border.UpdateLayout();
+                        double contentH = border.ActualHeight > 0 ? border.ActualHeight : 36.0;
+                        int smartMargin = Math.Max(2, (int)Math.Round((curTrayH - contentH) / 2.0));
+
+                        if (isLocked) {
+                            int targetX = rCurTray.Left + smartMargin;
+                            int targetY = rCurTray.Top + smartMargin;
+                            if (Math.Abs(win.Left - targetX) > 0.5 || Math.Abs(win.Top - targetY) > 0.5) {
+                                win.Left = targetX;
+                                win.Top = targetY;
+                            }
+                        }
+
                         // Rich dynamic tooltip
+                        string cpuTempInfo = pnlCpuT.Visibility == Visibility.Visible ? string.Format("\nCPU Temp: {0}", txtCpuT.Text) : "";
                         string gpuInfo = _hasNvml ? txtGpu.Text : "N/A";
                         string gpuTempInfo = _hasNvml ? txtGpuT.Text : "N/A";
                         tt.Content = string.Format(
-                            "WinTaskbarMonitor\n-------------------------\nCPU: {0}\nGPU: {1}\nRAM: {2:F1} / {3:F1} GB ({4})\nGPU Temp: {5}\n-------------------------\n• Right-click for options",
-                            txtCpu.Text, gpuInfo, usedGb, totGb, txtRam.Text, gpuTempInfo);
+                            "WinTaskbarMonitor\n-------------------------\nCPU: {0}{1}\nGPU: {2}\nRAM: {3:F1} / {4:F1} GB ({5})\nGPU Temp: {6}\n-------------------------\n• Smart Auto-Detection Active\n• Equal Smart Margin: {7}px\n• Right-click for options",
+                            txtCpu.Text, cpuTempInfo, gpuInfo, usedGb, totGb, txtRam.Text, gpuTempInfo, smartMargin);
 
                         // Periodically assert TOPMOST so Explorer/taskbar never obscures it
                         if (mainHwnd != IntPtr.Zero) {
@@ -287,6 +382,16 @@ namespace WinTaskbarMonitor.LiveDaemon {
                     int style = GetWindowLong(mainHwnd, -20);
                     SetWindowLong(mainHwnd, -20, style | 0x08000080);
                     SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0040);
+
+                    // Immediate initial layout update for smart margin
+                    border.UpdateLayout();
+                    double h = border.ActualHeight > 0 ? border.ActualHeight : 36.0;
+                    int sm = Math.Max(2, (int)Math.Round(((rTray.Bottom - rTray.Top) - h) / 2.0));
+                    if (posX <= 0) {
+                        win.Left = rTray.Left + sm;
+                        win.Top = rTray.Top + sm;
+                    }
+
                     timer.Start();
 
                     if (!string.IsNullOrEmpty(capPath)) {

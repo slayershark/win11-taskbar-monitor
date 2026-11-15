@@ -59,10 +59,12 @@ public sealed class MainWidgetViewModel : INotifyPropertyChanged
     public string RamTooltip { get => _ramTooltip; private set => SetField(ref _ramTooltip, value); }
     public Brush RamBrush { get => _ramBrush; private set => SetField(ref _ramBrush, value); }
 
+    private bool _hasValidCpuTemp = false;
+
     // Visibility toggles
     public bool ShowCpu => _settingsService.Current.ShowCpu;
     public bool ShowGpu => _settingsService.Current.ShowGpu;
-    public bool ShowCpuTemp => _settingsService.Current.ShowCpuTemp;
+    public bool ShowCpuTemp => _settingsService.Current.ShowCpuTemp && _hasValidCpuTemp;
     public bool ShowGpuTemp => _settingsService.Current.ShowGpuTemp;
     public bool ShowRam => _settingsService.Current.ShowRam;
 
@@ -172,14 +174,21 @@ public sealed class MainWidgetViewModel : INotifyPropertyChanged
         GpuTooltip = $"{snap.GpuName}\nUsage: {snap.GpuUsage:F1}%\nStatus: {(snap.GpuUsage >= 90 ? "Critical" : snap.GpuUsage >= 75 ? "Elevated" : "Normal")}";
         GpuBrush = GetStatusBrush(snap.GpuUsage, 75, 90);
 
-        // CPU Temp
-        if (snap.CpuTempC.HasValue)
+        // CPU Temp (Smart Auto-Detection)
+        bool hasValidCpu = snap.CpuTempC.HasValue && snap.CpuTempC.Value > 15 && snap.CpuTempC.Value < 115;
+        if (_hasValidCpuTemp != hasValidCpu)
         {
-            double temp = isFahrenheit ? (snap.CpuTempC.Value * 1.8 + 32) : snap.CpuTempC.Value;
+            _hasValidCpuTemp = hasValidCpu;
+            OnPropertyChanged(nameof(ShowCpuTemp));
+        }
+
+        if (hasValidCpu)
+        {
+            double temp = isFahrenheit ? (snap.CpuTempC!.Value * 1.8 + 32) : snap.CpuTempC!.Value;
             string unit = isFahrenheit ? "°F" : "°C";
             CpuTempValue = $"{Math.Round(temp)}{unit}";
             CpuTempTooltip = $"CPU Temperature: {temp:F1}{unit}\nThreshold: Warning 75°C, Critical 85°C";
-            CpuTempBrush = GetStatusBrush(snap.CpuTempC.Value, 75, 85);
+            CpuTempBrush = GetStatusBrush(snap.CpuTempC!.Value, 75, 85);
         }
         else
         {

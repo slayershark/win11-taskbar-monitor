@@ -149,10 +149,11 @@ public sealed class TaskbarAnchorEngine : IDisposable
             double dpiX = dpi.DpiScaleX;
             double dpiY = dpi.DpiScaleY;
 
+            _window.UpdateLayout();
             double windowWidth = _window.ActualWidth > 0 ? _window.ActualWidth : _window.Width;
             double windowHeight = _window.ActualHeight > 0 ? _window.ActualHeight : _window.Height;
 
-            if (double.IsNaN(windowWidth) || windowWidth <= 0) windowWidth = 380;
+            if (double.IsNaN(windowWidth) || windowWidth <= 0) windowWidth = 240;
             if (double.IsNaN(windowHeight) || windowHeight <= 0) windowHeight = 36;
 
             var settings = _settingsService.Current;
@@ -171,16 +172,16 @@ public sealed class TaskbarAnchorEngine : IDisposable
             RECT trayRect = default;
             bool hasTrayRect = trayNotifyWnd != IntPtr.Zero && GetWindowRect(trayNotifyWnd, out trayRect);
 
-            // Calculate Y anchor (vertically centered in taskbar)
+            // Calculate Smart Equal Margin (vertically centered in taskbar, equal on left/top/bottom)
             double taskbarHeightDpi = taskbarRect.Height / dpiY;
             double taskbarTopDpi = taskbarRect.Top / dpiY;
-            double vMargin = Math.Max(2, (taskbarHeightDpi - windowHeight) / 2.0);
+            double vMargin = Math.Max(2, Math.Round((taskbarHeightDpi - windowHeight) / 2.0));
             targetScreenY = taskbarTopDpi + vMargin;
 
-            // Calculate X anchor
+            // Calculate X anchor with smart equal margin
             if (settings.Alignment == TaskbarAlignment.LeftEdge)
             {
-                // Fixed on left side of taskbar with equal margin
+                // Fixed on left side of taskbar with exact equal margin
                 targetScreenX = (taskbarRect.Left / dpiX) + vMargin;
             }
             else if (settings.Alignment == TaskbarAlignment.RightEdge || !hasTrayRect)

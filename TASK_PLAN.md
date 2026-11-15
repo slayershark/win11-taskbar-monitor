@@ -236,3 +236,7 @@ Status Indicators:
   - *Description*: Resolve Windows Defender SAC blocks by deploying a zero-policy PowerShell runner for shortcuts and signing `WinTaskbarMonitor.exe` with a local Authenticode certificate.
   - *Expected Outcome*: Clean execution from Desktop and Start Menu without security warning prompts.
   - *Verification Requirements*: Updated shortcuts in `install.ps1` and tested execution.
+- [x] **Task 12.4: Smart Auto-Detection for CPU Temperature and Smart Equal Margin Engine**
+  - *Description*: Implement dynamic sensor probing (ACPI WMI and LibreHardwareMonitorLib) that auto-shows `CPU°` on supported devices/elevated runs and cleanly collapses it on unprivileged devices (never showing `N/A`). Implement dynamic smart margin calculation matching top, bottom, and left margins across all taskbar heights and DPI scales.
+  - *Expected Outcome*: Seamless auto-detection and pixel-perfect equal margin positioning.
+  - *Verification Requirements*: Verified live on desktop in `verified_smart_detection.png` and compiled in Release binary.
