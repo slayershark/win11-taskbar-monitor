@@ -17,6 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Dynamically computes `smartMargin = Math.Max(2, (taskbarHeight - contentH) / 2)` across any DPI scale (100%, 125%, 150%, 200%).
   - Anchors the widget at `Left = rTray.Left + smartMargin` and `Top = rTray.Top + smartMargin`, guaranteeing exact equal margins on the top, bottom, and left.
   - Implements dynamic self-healing if taskbar dimensions, screen resolution, or DPI change.
+- **Minimal Pure-Metric Hover Tooltips**:
+  - Removed all extra descriptions, app titles, horizontal rules, feature status text, and usage tips from hover tooltips.
+  - Tooltips now display pure, concise telemetry metrics only.
 
 ---
 

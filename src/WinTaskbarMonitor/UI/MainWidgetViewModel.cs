@@ -166,12 +166,12 @@ public sealed class MainWidgetViewModel : INotifyPropertyChanged
 
         // CPU
         CpuValue = $"{Math.Round(snap.CpuUsage)}%";
-        CpuTooltip = $"{snap.CpuName}\nUsage: {snap.CpuUsage:F1}%\nStatus: {(snap.CpuUsage >= 90 ? "Critical" : snap.CpuUsage >= 75 ? "Elevated" : "Normal")}";
+        CpuTooltip = $"{snap.CpuName}: {snap.CpuUsage:F1}%";
         CpuBrush = GetStatusBrush(snap.CpuUsage, 75, 90);
 
         // GPU
         GpuValue = $"{Math.Round(snap.GpuUsage)}%";
-        GpuTooltip = $"{snap.GpuName}\nUsage: {snap.GpuUsage:F1}%\nStatus: {(snap.GpuUsage >= 90 ? "Critical" : snap.GpuUsage >= 75 ? "Elevated" : "Normal")}";
+        GpuTooltip = $"{snap.GpuName}: {snap.GpuUsage:F1}%";
         GpuBrush = GetStatusBrush(snap.GpuUsage, 75, 90);
 
         // CPU Temp (Smart Auto-Detection)
@@ -187,13 +187,13 @@ public sealed class MainWidgetViewModel : INotifyPropertyChanged
             double temp = isFahrenheit ? (snap.CpuTempC!.Value * 1.8 + 32) : snap.CpuTempC!.Value;
             string unit = isFahrenheit ? "°F" : "°C";
             CpuTempValue = $"{Math.Round(temp)}{unit}";
-            CpuTempTooltip = $"CPU Temperature: {temp:F1}{unit}\nThreshold: Warning 75°C, Critical 85°C";
+            CpuTempTooltip = $"CPU: {temp:F1}{unit}";
             CpuTempBrush = GetStatusBrush(snap.CpuTempC!.Value, 75, 85);
         }
         else
         {
             CpuTempValue = "N/A";
-            CpuTempTooltip = "CPU Temperature: Unavailable in standard user mode without kernel driver";
+            CpuTempTooltip = "";
             CpuTempBrush = _themeManager.TextSubtleBrush;
         }
 
@@ -203,13 +203,13 @@ public sealed class MainWidgetViewModel : INotifyPropertyChanged
             double temp = isFahrenheit ? (snap.GpuTempC.Value * 1.8 + 32) : snap.GpuTempC.Value;
             string unit = isFahrenheit ? "°F" : "°C";
             GpuTempValue = $"{Math.Round(temp)}{unit}";
-            GpuTempTooltip = $"GPU Temperature ({snap.GpuName}): {temp:F1}{unit}\nThreshold: Warning 75°C, Critical 85°C";
+            GpuTempTooltip = $"GPU: {temp:F1}{unit}";
             GpuTempBrush = GetStatusBrush(snap.GpuTempC.Value, 75, 85);
         }
         else
         {
             GpuTempValue = "N/A";
-            GpuTempTooltip = "GPU Temperature: Inactive or sensor unavailable";
+            GpuTempTooltip = "";
             GpuTempBrush = _themeManager.TextSubtleBrush;
         }
 
@@ -223,8 +223,7 @@ public sealed class MainWidgetViewModel : INotifyPropertyChanged
             RamValue = $"{snap.RamUsedGb:F1}/{snap.RamTotalGb:F0}G · {Math.Round(snap.RamUsagePercent)}%";
         }
 
-        double freeGb = Math.Max(0, snap.RamTotalGb - snap.RamUsedGb);
-        RamTooltip = $"Physical Memory:\nUsed: {snap.RamUsedGb:F2} GB ({snap.RamUsagePercent:F1}%)\nFree: {freeGb:F2} GB\nTotal: {snap.RamTotalGb:F2} GB";
+        RamTooltip = $"RAM: {snap.RamUsedGb:F1} / {snap.RamTotalGb:F1} GB ({snap.RamUsagePercent:F0}%)";
         RamBrush = GetStatusBrush(snap.RamUsagePercent, 75, 90);
     }
 

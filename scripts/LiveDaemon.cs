@@ -284,7 +284,7 @@ namespace WinTaskbarMonitor.LiveDaemon {
                 win.ContextMenu = menu;
 
                 ToolTip tt = new ToolTip();
-                tt.Content = "WinTaskbarMonitor\n• Left-click + drag to reposition\n• Right-click for options";
+                tt.Content = "CPU: Loading...\nGPU: Loading...\nRAM: Loading...";
                 win.ToolTip = tt;
 
                 IntPtr mainHwnd = IntPtr.Zero;
@@ -362,13 +362,16 @@ namespace WinTaskbarMonitor.LiveDaemon {
                             }
                         }
 
-                        // Rich dynamic tooltip
-                        string cpuTempInfo = pnlCpuT.Visibility == Visibility.Visible ? string.Format("\nCPU Temp: {0}", txtCpuT.Text) : "";
-                        string gpuInfo = _hasNvml ? txtGpu.Text : "N/A";
-                        string gpuTempInfo = _hasNvml ? txtGpuT.Text : "N/A";
-                        tt.Content = string.Format(
-                            "WinTaskbarMonitor\n-------------------------\nCPU: {0}{1}\nGPU: {2}\nRAM: {3:F1} / {4:F1} GB ({5})\nGPU Temp: {6}\n-------------------------\n• Smart Auto-Detection Active\n• Equal Smart Margin: {7}px\n• Right-click for options",
-                            txtCpu.Text, cpuTempInfo, gpuInfo, usedGb, totGb, txtRam.Text, gpuTempInfo, smartMargin);
+                        // Clean, minimal hover tooltip (no extra descriptions)
+                        string cpuLine = pnlCpuT.Visibility == Visibility.Visible 
+                            ? string.Format("CPU: {0} ({1})", txtCpu.Text, txtCpuT.Text)
+                            : string.Format("CPU: {0}", txtCpu.Text);
+                        string gpuLine = _hasNvml 
+                            ? string.Format("GPU: {0} ({1})", txtGpu.Text, txtGpuT.Text)
+                            : string.Format("GPU: {0}", txtGpu.Text);
+                        string ramLine = string.Format("RAM: {0:F1} / {1:F1} GB ({2})", usedGb, totGb, txtRam.Text);
+
+                        tt.Content = string.Format("{0}\n{1}\n{2}", cpuLine, gpuLine, ramLine);
 
                         // Periodically assert TOPMOST so Explorer/taskbar never obscures it
                         if (mainHwnd != IntPtr.Zero) {
