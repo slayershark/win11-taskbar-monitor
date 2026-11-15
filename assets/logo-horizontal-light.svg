@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200">
+  <defs>
+    <style>
+      .brand-title { font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size: 52px; }
+      .brand-sub { font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 2.5px; fill: #64748B; }
+    </style>
+  </defs>
+
+  <!-- Symbol scaled to 140x140 at x=30, y=30 -->
+  <g transform="translate(30, 30) scale(0.2734375)">
+    <!-- Container -->
+    <rect x="32" y="32" width="448" height="448" rx="96" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="4" />
+    <!-- Pillars -->
+    <rect x="130" y="148" width="36" height="196" rx="18" fill="#0284C7" />
+    <rect x="202" y="228" width="36" height="116" rx="18" fill="#0EA5E9" />
+    <rect x="274" y="124" width="36" height="220" rx="18" fill="#0369A1" />
+    <rect x="346" y="180" width="36" height="164" rx="18" fill="#0284C7" />
+    <rect x="106" y="376" width="300" height="28" rx="14" fill="#0F172A" />
+  </g>
+
+  <!-- Typography -->
+  <text x="200" y="105" class="brand-title">
+    <tspan font-weight="700" fill="#0F172A">Win</tspan><tspan font-weight="600" fill="#0284C7">Taskbar</tspan><tspan font-weight="350" fill="#64748B">Monitor</tspan>
+  </text>
+  <text x="202" y="142" class="brand-sub">
+    LIGHTWEIGHT HARDWARE TELEMETRY
+  </text>
+</svg>

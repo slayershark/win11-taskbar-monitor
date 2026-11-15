@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <g id="telemetry-w-mark-mono-black" fill="#000000">
+    <rect x="130" y="148" width="36" height="196" rx="18" />
+    <rect x="202" y="228" width="36" height="116" rx="18" />
+    <rect x="274" y="124" width="36" height="220" rx="18" />
+    <rect x="346" y="180" width="36" height="164" rx="18" />
+    <rect x="106" y="376" width="300" height="28" rx="14" />
+  </g>
+</svg>

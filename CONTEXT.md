@@ -21,12 +21,16 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `b8d55ce` (feat: remove CPU temp N/A and anchor fixed to left taskbar with equal margins)
+  - Latest Commit: `b8d55ce` (Pending brand identity and SAC runner commit)
 
 ---
 
 ## 3. Completed Features
 
+- [x] **Brand Identity System**: Custom-designed "Telemetry W & Taskbar Horizon" vector identity, multi-res Windows `app.ico` (16–256px), 8 high-DPI raster assets, and full branding across XAML views and installer.
+- [x] **Smart App Control (SAC) Mitigation**: Zero-policy PowerShell host runner configured in shortcuts and installer, eliminating Smart App Control blocking prompts without requiring Developer Mode.
+- [x] **Left-Fixed Taskbar Layout**: Anchored to the far-left taskbar with exact equal 6px margins on top, bottom, and left (`X = 6, Y = 1038, Height = 36`).
+- [x] **4-Metric Streamlined Layout**: Completely removed `CPU° N/A`, displaying active streams `CPU`, `GPU`, `GPU°`, and `RAM`.
 - [x] **CPU Monitoring**: Zero-allocation Win32 `GetSystemTimes` calculating instantaneous system processor usage.
 - [x] **RAM Monitoring**: Win32 `GlobalMemoryStatusEx` calculating total GB, used GB, and percentage (matches Task Manager).
 - [x] **GPU Monitoring**: Dual-pipeline architecture with native `nvml.dll` P/Invoke for NVIDIA cards and LibreHardwareMonitorLib for Intel Iris Xe and AMD cards.

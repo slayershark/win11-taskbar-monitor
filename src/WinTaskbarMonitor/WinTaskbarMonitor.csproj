@@ -13,7 +13,14 @@
     <Company>slayershark</Company>
     <Product>WinTaskbarMonitor</Product>
     <Description>Lightweight Windows 11 Taskbar System Monitor</Description>
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\app.ico" />
+    <Resource Include="Resources\app_32.png" />
+    <Resource Include="Resources\app_256.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />

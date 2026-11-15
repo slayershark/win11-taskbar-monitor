@@ -220,3 +220,19 @@ Status Indicators:
   - *Dependencies*: Task 11.1.
   - *Verification Requirements*: Complete summary presented to user.
   - *Blockers*: None.
+
+---
+
+## Phase 12: Brand Identity System & Smart App Control Mitigation
+- [x] **Task 12.1: Brand Identity Design & Multi-Resolution Vector/Raster Assets**
+  - *Description*: Design a distinctive, professional brand identity ("Telemetry W & Taskbar Horizon") avoiding generic AI tropes. Author vector SVGs, 8 high-DPI PNGs (16-512px), and multi-frame Windows `app.ico` (16-256px).
+  - *Expected Outcome*: Complete asset library under `assets/` and integrated into WPF views and csproj.
+  - *Verification Requirements*: Verified in `brand_identity_system.md` artifact and compiled binary.
+- [x] **Task 12.2: Streamlined 4-Metric Left-Fixed Taskbar Layout**
+  - *Description*: Remove unprivileged `CPU° N/A` metric; anchor 4 active streams (`CPU`, `GPU`, `GPU°`, `RAM`) fixed to the left taskbar with equal 6px margins on top, bottom, and left.
+  - *Expected Outcome*: Crisp 2-row layout with equal margins and position lock.
+  - *Verification Requirements*: Visual proof captured at `verified_taskbar_left_fixed.png`.
+- [x] **Task 12.3: Windows 11 Smart App Control (SAC) Mitigation & Installer Refresh**
+  - *Description*: Resolve Windows Defender SAC blocks by deploying a zero-policy PowerShell runner for shortcuts and signing `WinTaskbarMonitor.exe` with a local Authenticode certificate.
+  - *Expected Outcome*: Clean execution from Desktop and Start Menu without security warning prompts.
+  - *Verification Requirements*: Updated shortcuts in `install.ps1` and tested execution.

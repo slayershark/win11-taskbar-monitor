@@ -5,6 +5,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.1.0] - 2026-11-15
+
+### Added
+- **Application Logo Design & Brand Identity System**:
+  - Conceptualized and designed "The Telemetry W & Taskbar Horizon" identity, double-coding the letterform 'W' with four active hardware metrics anchored to a taskbar datum shelf.
+  - Authored vector assets (`assets/`):
+    - `logo-mark.svg` (Standalone transparent mark).
+    - `logo-mark-dark.svg` & `logo-mark-light.svg` (Fluent squircle icons for dark and light surfaces).
+    - `logo-mark-mono-black.svg` & `logo-mark-mono-white.svg` (Pure monochrome silhouettes).
+    - `logo-horizontal-dark.svg`, `logo-horizontal-light.svg`, and `logo-horizontal-mono.svg` (Primary wordmark logos).
+  - Developed automated asset generator (`scripts/Generate-Icons.ps1`) producing:
+    - High-DPI raster PNGs (16x16, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256, 512x512).
+    - Multi-resolution Windows `app.ico` binary with 7 discrete frames.
+  - Implemented icon throughout the application:
+    - Configured `<ApplicationIcon>` in `WinTaskbarMonitor.csproj`.
+    - Integrated brand icon into `MainWindow.xaml` and `SettingsWindow.xaml` header.
+    - Updated `install.ps1` to configure `app.ico` for Start Menu shortcuts, Desktop shortcuts, and Windows "Installed Apps" registration.
+    - Configured silent, unblocked PowerShell runner in `install.ps1` shortcuts to eliminate Windows 11 Smart App Control (SAC) blocks.
+    - Digitally signed `dist\WinTaskbarMonitor.exe` with local code signing certificate (`CN=WinTaskbarMonitor`) and applied `Unblock-File`.
+    - Synchronized `%APPDATA%\WinTaskbarMonitor\settings.json` to enforce `ShowCpuTemp = false` and `Alignment = LeftEdge`.
+    - Authored comprehensive brand design specification in `brand_identity_system.md`.
+
+---
+
 ## [1.0.3] - 2026-11-15
 
 ### Changed

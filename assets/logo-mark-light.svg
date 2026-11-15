@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Windows 11 Fluent Light Squircle Container -->
+  <rect x="32" y="32" width="448" height="448" rx="96" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="2" />
+  
+  <g id="telemetry-w-mark">
+    <!-- Pillar 1: CPU Stream -->
+    <rect x="130" y="148" width="36" height="196" rx="18" fill="#0284C7" />
+    
+    <!-- Pillar 2: GPU Stream -->
+    <rect x="202" y="228" width="36" height="116" rx="18" fill="#0EA5E9" />
+    
+    <!-- Pillar 3: Peak Stream -->
+    <rect x="274" y="124" width="36" height="220" rx="18" fill="#0369A1" />
+    
+    <!-- Pillar 4: RAM Stream -->
+    <rect x="346" y="180" width="36" height="164" rx="18" fill="#0284C7" />
+    
+    <!-- Taskbar Base Horizon -->
+    <rect x="106" y="376" width="300" height="28" rx="14" fill="#0F172A" />
+  </g>
+</svg>

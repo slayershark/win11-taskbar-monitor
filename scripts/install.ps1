@@ -74,10 +74,16 @@ if (!(Test-Path $installDir)) {
 }
 
 Copy-Item -Path $sourceExe -Destination $targetExe -Force
+Unblock-File -Path $targetExe -ErrorAction SilentlyContinue
 Copy-Item -Path "$PSScriptRoot\uninstall.ps1" -Destination $targetUninstallScript -Force
 Copy-Item -Path "$PSScriptRoot\Run-WinTaskbarMonitor.ps1" -Destination "$installDir\Run-WinTaskbarMonitor.ps1" -Force
 Copy-Item -Path "$PSScriptRoot\LiveDaemon.cs" -Destination "$installDir\LiveDaemon.cs" -Force
-Write-Host "[+] Copied executable, runner daemon, and uninstaller" -ForegroundColor Green
+$icoSource = "$PSScriptRoot\..\assets\app.ico"
+$targetIco = "$installDir\app.ico"
+if (Test-Path $icoSource) {
+    Copy-Item -Path $icoSource -Destination $targetIco -Force
+}
+Write-Host "[+] Copied executable, icon, runner daemon, and uninstaller" -ForegroundColor Green
 
 # 4. Create Start Menu Shortcut (Using silent runner to prevent SAC policy blocks)
 $shortcutPath = "$startMenuDir\WinTaskbarMonitor.lnk"
@@ -87,7 +93,7 @@ $shortcut.TargetPath = "powershell.exe"
 $shortcut.Arguments = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
 $shortcut.WorkingDirectory = $installDir
 $shortcut.Description = "Lightweight Windows 11 Taskbar System Monitor"
-$shortcut.IconLocation = "$targetExe,0"
+$shortcut.IconLocation = if (Test-Path $targetIco) { "$targetIco,0" } else { "$targetExe,0" }
 $shortcut.Save()
 Write-Host "[+] Created Start Menu shortcut in $startMenuDir" -ForegroundColor Green
 
@@ -99,7 +105,7 @@ if ($CreateDesktopShortcut) {
     $scDesktop.Arguments = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
     $scDesktop.WorkingDirectory = $installDir
     $scDesktop.Description = "Lightweight Windows 11 Taskbar System Monitor"
-    $scDesktop.IconLocation = "$targetExe,0"
+    $scDesktop.IconLocation = if (Test-Path $targetIco) { "$targetIco,0" } else { "$targetExe,0" }
     $scDesktop.Save()
     Write-Host "[+] Created Desktop shortcut" -ForegroundColor Green
 }
@@ -115,7 +121,8 @@ Set-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "WinTaskbarMonit
 Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.0.0"
 Set-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "slayershark"
 Set-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $installDir
-Set-ItemProperty -Path $uninstallKey -Name "DisplayIcon" -Value "$targetExe,0"
+$displayIcon = if (Test-Path $targetIco) { "$targetIco,0" } else { "$targetExe,0" }
+Set-ItemProperty -Path $uninstallKey -Name "DisplayIcon" -Value $displayIcon
 Set-ItemProperty -Path $uninstallKey -Name "UninstallString" -Value "powershell.exe -ExecutionPolicy Bypass -File `"$targetUninstallScript`""
 Set-ItemProperty -Path $uninstallKey -Name "EstimatedSize" -Value $exeSizeKb
 Set-ItemProperty -Path $uninstallKey -Name "NoModify" -Value 1 -Type DWord
