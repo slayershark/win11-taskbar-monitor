@@ -10,7 +10,7 @@
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
-        Topmost="True"
+        Topmost="False"
         ShowInTaskbar="False"
         SizeToContent="WidthAndHeight"
         ResizeMode="NoResize"
@@ -58,11 +58,11 @@
         </Style>
     </Window.Resources>
 
-    <Border CornerRadius="6"
-            BorderThickness="1"
-            Background="{Binding Theme.BackgroundBrush}"
-            BorderBrush="{Binding Theme.BorderBrush}"
-            Padding="7,2,7,2"
+    <Border CornerRadius="4"
+            BorderThickness="0"
+            Background="Transparent"
+            BorderBrush="Transparent"
+            Padding="6,2,6,2"
             SnapsToDevicePixels="True">
 
         <Border.ContextMenu>

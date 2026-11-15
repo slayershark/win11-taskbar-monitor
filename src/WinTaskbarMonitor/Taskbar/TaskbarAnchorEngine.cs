@@ -71,6 +71,15 @@ public sealed class TaskbarAnchorEngine : IDisposable
     [DllImport("user32.dll")]
     private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr")]
+    private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    private static IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
+    {
+        if (IntPtr.Size == 8) return SetWindowLongPtr64(hWnd, nIndex, dwNewLong);
+        return new IntPtr(SetWindowLong(hWnd, nIndex, dwNewLong.ToInt32()));
+    }
+
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
     private static extern uint RegisterWindowMessage(string lpString);
     #endregion
@@ -99,6 +108,13 @@ public sealed class TaskbarAnchorEngine : IDisposable
         // Apply WS_EX_TOOLWINDOW and WS_EX_NOACTIVATE styles
         int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
         SetWindowLong(hWnd, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
+
+        // Explicitly attach to Windows Taskbar as owned window so it sits flush on taskbar
+        IntPtr shellTray = FindWindow("Shell_TrayWnd", null);
+        if (shellTray != IntPtr.Zero)
+        {
+            SetWindowLongPtr(hWnd, -8 /* GWL_HWNDPARENT */, shellTray);
+        }
 
         _hwndSource = HwndSource.FromHwnd(hWnd);
         _hwndSource?.AddHook(WndProc);

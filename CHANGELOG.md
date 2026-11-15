@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.1.6] - 2026-11-15
+
+### Changed
+- **Native Taskbar Integration & Flush Surface Docking (No Hovering Card)**:
+  - **Taskbar Ownership (`GWL_HWNDPARENT`)**: Replaced independent `HWND_TOPMOST` floating window with taskbar ownership via `SetWindowLongPtr(mainHwnd, GWL_HWNDPARENT, taskbarHwnd)`. The widget is now officially an owned window of `Shell_TrayWnd`, naturally sharing its z-order and lifecycle without floating over fullscreen games or apps.
+  - **Flush Glass Rendering**: Removed the floating opaque dark card background (`FromArgb(235, 24, 24, 24)`) and outer border (`BorderThickness = 0`, `Background = Transparent`). Metrics now render directly onto the Windows 11 taskbar's native mica/acrylic glass, looking like a native system component.
+  - **Interactive Taskbar Hover State**: Added subtle Fluent pill highlight on mouse hover (`rgba(255, 255, 255, 0.11)`) mirroring native Windows 11 taskbar buttons.
+  - **Taskbar Appearance Selector**: Added right-click context menu options for `Taskbar Style & Appearance`:
+    - `Native Taskbar (Flush on Glass - Default)`
+    - `Fluent Capsule (Subtle Pill)`
+    - `Floating HUD Card (Original Frame)`
+
+---
+
 ## [1.1.5] - 2026-11-15
 
 ### Fixed

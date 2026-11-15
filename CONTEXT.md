@@ -27,6 +27,10 @@
 
 ## 3. Completed Features
 
+- [x] **Native Taskbar Integration & Flush Surface Docking**:
+  - Bound widget directly to the Windows Taskbar as an owned window using `SetWindowLongPtr(mainHwnd, GWL_HWNDPARENT, taskbarHwnd)`, so its Z-order and visibility are tied natively to `Shell_TrayWnd` rather than floating as an independent `HWND_TOPMOST` overlay.
+  - Eliminated the floating dark card background and outer borders (`BorderThickness = 0`, `Background = Transparent`), rendering telemetry text directly onto the Windows 11 acrylic/mica glass surface matching native taskbar controls.
+  - Added interactive taskbar pill hover highlighting (`rgba(255, 255, 255, 0.11)`) and right-click Context Menu selector for `Taskbar Style & Appearance` (Native Taskbar, Fluent Capsule, Floating Card).
 - [x] **100% Real-Time Data Synchronization & Sys_Mon Parity**:
   - Researched the exact telemetry engine of `sys_mon-system-monitor` (`Sys_MonSystemMonitor.Services.TelemetryService`) installed on the host machine.
   - Identified that sys_mon isolates the discrete NVIDIA GPU (`_isNvidiaSelected = true`) and streams `nvidia-smi` / NVML metrics directly, ensuring GPU% and GPU°C originate from the identical silicon.

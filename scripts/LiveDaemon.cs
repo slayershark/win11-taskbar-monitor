@@ -34,6 +34,17 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         [DllImport("user32.dll")]
         public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 
+        [DllImport("user32.dll", EntryPoint = "SetWindowLong")]
+        public static extern int SetWindowLong32(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr")]
+        public static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        public static IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong) {
+            if (IntPtr.Size == 8) return SetWindowLongPtr64(hWnd, nIndex, dwNewLong);
+            return new IntPtr(SetWindowLong32(hWnd, nIndex, dwNewLong.ToInt32()));
+        }
+
         [DllImport("user32.dll")]
         public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
@@ -119,6 +130,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         private static IntPtr _hGpuCounter = IntPtr.Zero;
         private static bool _hasPdh = false;
         private static int _gpuMode = 0; // 0 = Dedicated/NVIDIA (Task Manager GPU 1), 1 = Integrated/Intel (Task Manager GPU 0), 2 = Peak Load
+        private static int _styleMode = 0; // 0 = Native Taskbar (Flush on Glass - Default), 1 = Fluent Capsule, 2 = Floating Card
 
         private static double? QueryCpuTemp() {
             try {
@@ -173,7 +185,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 win.WindowStyle = WindowStyle.None;
                 win.AllowsTransparency = true;
                 win.Background = System.Windows.Media.Brushes.Transparent;
-                win.Topmost = true;
+                win.Topmost = false;
                 win.ShowInTaskbar = false;
                 win.SizeToContent = SizeToContent.WidthAndHeight;
                 win.ResizeMode = ResizeMode.NoResize;
@@ -193,11 +205,40 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 win.Top = defaultY;
 
                 Border border = new Border();
-                border.CornerRadius = new CornerRadius(6);
-                border.BorderThickness = new Thickness(1);
-                border.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 24, 24, 24));
-                border.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(70, 255, 255, 255));
-                border.Padding = new Thickness(7, 2, 7, 2);
+                border.CornerRadius = new CornerRadius(4);
+                border.BorderThickness = new Thickness(0);
+                border.Background = System.Windows.Media.Brushes.Transparent;
+                border.BorderBrush = System.Windows.Media.Brushes.Transparent;
+                border.Padding = new Thickness(6, 2, 6, 2);
+
+                Action applyStyle = () => {
+                    if (_styleMode == 0) {
+                        // Native Flat: transparent background, zero border, sits directly on taskbar surface
+                        border.Background = System.Windows.Media.Brushes.Transparent;
+                        border.BorderBrush = System.Windows.Media.Brushes.Transparent;
+                        border.BorderThickness = new Thickness(0);
+                        border.CornerRadius = new CornerRadius(4);
+                    } else if (_styleMode == 1) {
+                        // Fluent Capsule: subtle taskbar pill
+                        border.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
+                        border.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 255, 255, 255));
+                        border.BorderThickness = new Thickness(1);
+                        border.CornerRadius = new CornerRadius(4);
+                    } else {
+                        // Floating HUD Card: dark frame
+                        border.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 24, 24, 24));
+                        border.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(70, 255, 255, 255));
+                        border.BorderThickness = new Thickness(1);
+                        border.CornerRadius = new CornerRadius(6);
+                    }
+                };
+
+                border.MouseEnter += (s, e) => {
+                    border.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 255, 255, 255));
+                };
+                border.MouseLeave += (s, e) => {
+                    applyStyle();
+                };
 
                 StackPanel stack = new StackPanel();
                 stack.Orientation = Orientation.Horizontal;
@@ -336,9 +377,35 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 gpuMenu.Items.Add(gpuItemIntel);
                 gpuMenu.Items.Add(gpuItemPeak);
 
+                MenuItem styleMenu = new MenuItem { Header = "Taskbar Style & Appearance" };
+                MenuItem styleNative = new MenuItem { Header = "Native Taskbar (Flush on Glass - Default)", IsCheckable = true, IsChecked = true };
+                MenuItem stylePill = new MenuItem { Header = "Fluent Capsule (Subtle Pill)", IsCheckable = true, IsChecked = false };
+                MenuItem styleCard = new MenuItem { Header = "Floating HUD Card (Original Frame)", IsCheckable = true, IsChecked = false };
+
+                styleNative.Click += (s, e) => {
+                    _styleMode = 0;
+                    styleNative.IsChecked = true; stylePill.IsChecked = false; styleCard.IsChecked = false;
+                    applyStyle();
+                };
+                stylePill.Click += (s, e) => {
+                    _styleMode = 1;
+                    styleNative.IsChecked = false; stylePill.IsChecked = true; styleCard.IsChecked = false;
+                    applyStyle();
+                };
+                styleCard.Click += (s, e) => {
+                    _styleMode = 2;
+                    styleNative.IsChecked = false; stylePill.IsChecked = false; styleCard.IsChecked = true;
+                    applyStyle();
+                };
+
+                styleMenu.Items.Add(styleNative);
+                styleMenu.Items.Add(stylePill);
+                styleMenu.Items.Add(styleCard);
+
                 menu.Items.Add(itemLock);
                 menu.Items.Add(posMenu);
                 menu.Items.Add(gpuMenu);
+                menu.Items.Add(styleMenu);
                 menu.Items.Add(itemReset);
                 menu.Items.Add(new Separator());
                 menu.Items.Add(itemExit);
@@ -519,9 +586,9 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                         tt.Content = string.Format("{0}\n{1}\n{2}", cpuLine, gpuLine, ramLine);
 
-                        // Periodically assert TOPMOST so Explorer/taskbar never obscures it
-                        if (mainHwnd != IntPtr.Zero) {
-                            SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
+                        // Maintain Z-order anchored directly to the Taskbar surface (never hovering over fullscreen apps)
+                        if (mainHwnd != IntPtr.Zero && curTray != IntPtr.Zero) {
+                            SetWindowPos(mainHwnd, curTray, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
                         }
                     } catch {}
                 };
@@ -530,7 +597,13 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                     mainHwnd = new WindowInteropHelper(win).Handle;
                     int style = GetWindowLong(mainHwnd, -20);
                     SetWindowLong(mainHwnd, -20, style | 0x08000080);
-                    SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0040);
+
+                    // Explicitly attach as an owned window of Shell_TrayWnd so it actually sits ON the taskbar
+                    IntPtr taskbarHwnd = FindWindow("Shell_TrayWnd", null);
+                    if (taskbarHwnd != IntPtr.Zero) {
+                        SetWindowLongPtr(mainHwnd, -8 /* GWL_HWNDPARENT */, taskbarHwnd);
+                        SetWindowPos(mainHwnd, taskbarHwnd, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
+                    }
 
                     // Immediate initial layout update for smart margin
                     border.UpdateLayout();
