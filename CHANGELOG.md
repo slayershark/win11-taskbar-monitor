@@ -20,6 +20,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Minimal Pure-Metric Hover Tooltips**:
   - Removed all extra descriptions, app titles, horizontal rules, feature status text, and usage tips from hover tooltips.
   - Tooltips now display pure, concise telemetry metrics only.
+- **Scaled Metric Names / Labels**:
+  - Increased metric label typography from `8.5pt` to `10.0pt` semi-bold (`CPU`, `GPU`, `GPU°`, `RAM`).
+  - Utilized available vertical headroom for clearer legibility while preserving exact equal 6px taskbar margins.
 
 ---
 

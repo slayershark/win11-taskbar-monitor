@@ -435,7 +435,7 @@ namespace WinTaskbarMonitor.LiveDaemon {
             };
             TextBlock lbl = new TextBlock { 
                 Text = label, 
-                FontSize = 8.5, 
+                FontSize = 10.0, 
                 FontWeight = FontWeights.SemiBold, 
                 Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)), 
                 HorizontalAlignment = HorizontalAlignment.Center, 
