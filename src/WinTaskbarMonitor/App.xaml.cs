@@ -8,7 +8,7 @@ namespace WinTaskbarMonitor;
 public partial class App : Application
 {
     private static Mutex? _mutex;
-    private const string MutexName = "WinTaskbarMonitor_SingleInstance_Mutex";
+    private const string MutexName = "Win11TaskbarMonitor_SingleInstance_Mutex";
 
     protected override void OnStartup(StartupEventArgs e)
     {

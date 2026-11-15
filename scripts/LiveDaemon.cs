@@ -10,7 +10,7 @@ using System.Windows.Interop;
 using System.Windows.Threading;
 using System.Management;
 
-namespace WinTaskbarMonitor.LiveDaemon {
+namespace Win11TaskbarMonitor.LiveDaemon {
     public class LiveApp {
         [DllImport("user32.dll", SetLastError = true)]
         public static extern IntPtr OpenDesktop(string lpszDesktop, uint dwFlags, bool fInherit, uint dwDesiredAccess);
@@ -137,7 +137,7 @@ namespace WinTaskbarMonitor.LiveDaemon {
                 };
 
                 Window win = new Window();
-                win.Title = "WinTaskbarMonitor";
+                win.Title = "Win11TaskbarMonitor";
                 win.WindowStyle = WindowStyle.None;
                 win.AllowsTransparency = true;
                 win.Background = System.Windows.Media.Brushes.Transparent;
@@ -269,7 +269,7 @@ namespace WinTaskbarMonitor.LiveDaemon {
                     win.Top = rt.Top + sm;
                 };
 
-                MenuItem itemExit = new MenuItem { Header = "Exit WinTaskbarMonitor" };
+                MenuItem itemExit = new MenuItem { Header = "Exit Win11TaskbarMonitor" };
                 itemExit.Click += (s, e) => {
                     win.Close();
                     System.Windows.Threading.Dispatcher.ExitAllFrames();

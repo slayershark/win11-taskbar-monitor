@@ -8,7 +8,7 @@ namespace WinTaskbarMonitor.Config;
 
 public sealed class SettingsService : ISettingsService
 {
-    private const string AppName = "WinTaskbarMonitor";
+    private const string AppName = "Win11TaskbarMonitor";
     private const string StartupRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
     private readonly string _settingsFilePath;

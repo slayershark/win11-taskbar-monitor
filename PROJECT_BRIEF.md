@@ -2,9 +2,9 @@
 
 ## 1. Project Overview
 
-**WinTaskbarMonitor** is a lightweight, dedicated Windows 11 desktop utility designed to monitor critical hardware parameters in real time directly from or alongside the Windows taskbar. 
+**Win11TaskbarMonitor** is a lightweight, dedicated Windows 11 desktop utility designed to monitor critical hardware parameters in real time directly from or alongside the Windows taskbar. 
 
-Inspired by utilities like Sys_Mon System Monitor, WinTaskbarMonitor strips away superfluous UI bloat, heavy web-view dependencies (Electron/Chromium), unnecessary cloud synchronisation, and heavy background overhead, delivering an instantaneous, at-a-glance hardware telemetry experience.
+Inspired by utilities like Sys_Mon System Monitor, Win11TaskbarMonitor strips away superfluous UI bloat, heavy web-view dependencies (Electron/Chromium), unnecessary cloud synchronisation, and heavy background overhead, delivering an instantaneous, at-a-glance hardware telemetry experience.
 
 ---
 

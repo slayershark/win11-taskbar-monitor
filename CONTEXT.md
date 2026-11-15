@@ -2,9 +2,9 @@
 
 ## 1. Project Objectives & Current Status
 
-**Project**: WinTaskbarMonitor  
+**Project**: Win11TaskbarMonitor  
 **Objective**: Build a lightweight, native, and highly reliable Windows 11 taskbar hardware telemetry utility (CPU, GPU, CPU Temp, GPU Temp, RAM) without bloat, web dependencies, or excessive resource overhead.  
-**Current Milestone**: All 11 Phases Complete. Application is fully built, tested, published to `dist/`, and **installed onto the host system** at `%LOCALAPPDATA%\Programs\WinTaskbarMonitor` with Start Menu, Desktop shortcuts, and Windows startup configured.
+**Current Milestone**: Rebranded to Win11TaskbarMonitor. Application is fully built, tested, published to `dist/`, and **installed onto the host system** at `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor` with Start Menu and Desktop shortcuts configured.
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## 1. Project Objectives and Scope
 
-**Project Name**: WinTaskbarMonitor  
+**Project Name**: Win11TaskbarMonitor  
 **Objective**: Build a lightweight, native, and highly reliable Windows 11 system-monitoring utility that displays essential hardware metrics directly on or anchored alongside the Windows 11 taskbar without requiring users to open Task Manager or a separate resource-heavy dashboard.
 
 ### Core Metrics:

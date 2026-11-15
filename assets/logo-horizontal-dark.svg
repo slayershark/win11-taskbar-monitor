@@ -20,7 +20,7 @@
 
   <!-- Typography -->
   <text x="200" y="105" class="brand-title">
-    <tspan font-weight="700" fill="#F8FAFC">Win</tspan><tspan font-weight="600" fill="#38BDF8">Taskbar</tspan><tspan font-weight="350" fill="#94A3B8">Monitor</tspan>
+    <tspan font-weight="700" fill="#F8FAFC">Win</tspan><tspan font-weight="700" fill="#38BDF8">11</tspan><tspan font-weight="600" fill="#38BDF8">Taskbar</tspan><tspan font-weight="350" fill="#94A3B8">Monitor</tspan>
   </text>
   <text x="202" y="142" class="brand-sub">
     LIGHTWEIGHT HARDWARE TELEMETRY

@@ -1,8 +1,8 @@
-# WinTaskbarMonitor
+# Win11TaskbarMonitor
 
 **Lightweight Windows 11 Taskbar System Monitor**
 
-WinTaskbarMonitor is a native, ultra-lightweight Windows 11 desktop utility designed to display essential real-time hardware telemetry directly on or alongside your taskbar.
+Win11TaskbarMonitor is a native, ultra-lightweight Windows 11 desktop utility designed to display essential real-time hardware telemetry directly on or alongside your taskbar.
 
 ---
 
@@ -11,10 +11,10 @@ WinTaskbarMonitor is a native, ultra-lightweight Windows 11 desktop utility desi
 - **Essential Hardware Telemetry at a Glance**:
   - **CPU Utilisation**: Accurate real-time total CPU percentage.
   - **GPU Utilisation**: Overall GPU usage (supports NVIDIA, AMD, and Intel integrated/discrete GPUs).
-  - **CPU & GPU Temperatures**: Clean °C / °F readouts with graceful `N/A` degradation for unprivileged sensors.
+  - **CPU & GPU Temperatures**: Clean °C / °F readouts with smart auto-detection for supported sensors.
   - **RAM Utilisation**: Real-time memory percentage, used GB, and total capacity.
 - **Native Windows 11 Experience**:
-  - Docked directly next to the system tray / notification area.
+  - Docked directly on the left side of the Windows 11 taskbar with smart equal margins.
   - Segoe UI Variable typography with **tabular numbers** (zero horizontal text shifting).
   - Native Windows 11 dark, light, and automatic system theme integration.
   - Per-monitor DPI awareness and multi-monitor support.
@@ -54,10 +54,10 @@ This project follows a strict **Documentation-First Workflow**:
   .\scripts\install.ps1 -CreateDesktopShortcut -StartWithWindows
   ```
 
-This cleanly installs WinTaskbarMonitor to `%LOCALAPPDATA%\Programs\WinTaskbarMonitor`, creates a Windows Start Menu shortcut, and registers the application in Windows **Installed Apps / Add or Remove Programs**.
+This cleanly installs Win11TaskbarMonitor to `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor`, creates a Windows Start Menu shortcut, and registers the application in Windows **Installed Apps / Add or Remove Programs**.
 
 ### Uninstallation
-- **Via Windows Settings**: Open Windows **Settings > Apps > Installed apps**, search for **WinTaskbarMonitor**, and click **Uninstall**.
+- **Via Windows Settings**: Open Windows **Settings > Apps > Installed apps**, search for **Win11TaskbarMonitor**, and click **Uninstall**.
 - **Via Script**: Double-click [uninstall.cmd](uninstall.cmd) or run:
   ```powershell
   .\scripts\uninstall.ps1

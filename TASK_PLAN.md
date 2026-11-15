@@ -240,3 +240,7 @@ Status Indicators:
   - *Description*: Implement dynamic sensor probing (ACPI WMI and LibreHardwareMonitorLib) that auto-shows `CPU°` on supported devices/elevated runs and cleanly collapses it on unprivileged devices (never showing `N/A`). Implement dynamic smart margin calculation matching top, bottom, and left margins across all taskbar heights and DPI scales.
   - *Expected Outcome*: Seamless auto-detection and pixel-perfect equal margin positioning.
   - *Verification Requirements*: Verified live on desktop in `verified_smart_detection.png` and compiled in Release binary.
+- [x] **Task 12.5: Rebrand Project to Win11TaskbarMonitor**
+  - *Description*: Rebrand project across all source code, assembly outputs, installer scripts, desktop shortcuts, and vector brandmarks to **Win11TaskbarMonitor**.
+  - *Expected Outcome*: Clean consistency throughout the codebase and installed environment.
+  - *Verification Requirements*: Verified `Win11TaskbarMonitor.exe`, shortcuts, and vector SVGs.

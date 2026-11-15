@@ -1,7 +1,19 @@
 # CHANGELOG.md — Development History
 
-All notable changes to the **WinTaskbarMonitor** project will be documented in this file.  
+All notable changes to the **Win11TaskbarMonitor** project will be documented in this file.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [1.1.3] - 2026-11-15
+
+### Changed
+- **Rebranded to Win11TaskbarMonitor**:
+  - Renamed the project from **WinTaskbarMonitor** to **Win11TaskbarMonitor** to reflect its specialized Windows 11 taskbar integration.
+  - Updated assembly title, product metadata, and generated single-file executable to `dist/Win11TaskbarMonitor.exe`.
+  - Updated vector wordmarks (`assets/logo-horizontal-dark.svg`, `light`, `mono`) to feature `Win11TaskbarMonitor`.
+  - Updated installer (`scripts/install.ps1`) and uninstaller (`scripts/uninstall.ps1`) to deploy `Win11TaskbarMonitor.lnk` shortcuts and clean up legacy paths.
+  - Updated all batch runner scripts (`run.cmd`, `stop.cmd`, `install.cmd`, `uninstall.cmd`).
 
 ---
 

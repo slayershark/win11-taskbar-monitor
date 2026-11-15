@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:ui="clr-namespace:WinTaskbarMonitor.UI"
         mc:Ignorable="d"
-        Title="WinTaskbarMonitor"
+        Title="Win11TaskbarMonitor"
         Icon="Resources/app.ico"
         WindowStyle="None"
         AllowsTransparency="True"

@@ -1,4 +1,4 @@
-﻿# WinTaskbarMonitor — Persistent Live Desktop Monitor
+﻿# Win11TaskbarMonitor — Persistent Live Desktop Monitor
 param(
     [int]$AnchorX = 0,
     [string]$CaptureProofPath = ""
@@ -9,4 +9,4 @@ Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, Sys
 $source = Get-Content -Path "$PSScriptRoot\LiveDaemon.cs" -Raw -Encoding UTF8
 Add-Type -TypeDefinition $source -ReferencedAssemblies PresentationFramework, PresentationCore, WindowsBase, System.Drawing, System.Xaml, System.Management -ErrorAction Stop
 
-[WinTaskbarMonitor.LiveDaemon.LiveApp]::Launch($AnchorX, $CaptureProofPath)
+[Win11TaskbarMonitor.LiveDaemon.LiveApp]::Launch($AnchorX, $CaptureProofPath)

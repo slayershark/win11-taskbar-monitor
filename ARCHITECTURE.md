@@ -129,7 +129,7 @@ The widget is implemented as a lightweight WPF `Window` with specific Win32 exte
 
 ## 6. Configuration & Persistence
 
-- **Path**: `%APPDATA%\WinTaskbarMonitor\settings.json`
+- **Path**: `%APPDATA%\Win11TaskbarMonitor\settings.json`
 - **Schema**:
   - `RefreshIntervalMs`: (500, 1000, 2000, 5000 - default 1000)
   - `SelectedGpuIndex`: Target GPU device index

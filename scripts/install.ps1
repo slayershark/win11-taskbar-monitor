@@ -1,4 +1,4 @@
-﻿# WinTaskbarMonitor — Installation Script
+﻿# Win11TaskbarMonitor — Installation Script
 [CmdletBinding()]
 param(
     [ValidateSet("AllUsers", "CurrentUser")]
@@ -25,11 +25,11 @@ if ($Scope -eq "AllUsers" -and !$isAdmin) {
 }
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "         WinTaskbarMonitor — System Installation          " -ForegroundColor Cyan
+Write-Host "        Win11TaskbarMonitor — System Installation         " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # 1. Paths
-$sourceExe = "$PSScriptRoot\..\dist\WinTaskbarMonitor.exe"
+$sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor.exe"
 if (!(Test-Path $sourceExe)) {
     Write-Host "`n[*] Building release executable..." -ForegroundColor Yellow
     $dotnetRoot = if ($env:DOTNET_ROOT) { $env:DOTNET_ROOT } else { "$env:LOCALAPPDATA\dotnet" }
@@ -38,30 +38,30 @@ if (!(Test-Path $sourceExe)) {
 }
 
 if (!(Test-Path $sourceExe)) {
-    Write-Error "Could not find WinTaskbarMonitor.exe in $sourceExe"
+    Write-Error "Could not find Win11TaskbarMonitor.exe in $sourceExe"
     exit 1
 }
 
 # Determine target folder based on Scope
 if ($Scope -eq "AllUsers") {
-    $installDir = "$env:ProgramFiles\WinTaskbarMonitor"
+    $installDir = "$env:ProgramFiles\Win11TaskbarMonitor"
     $startMenuDir = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs"
     $desktopPath = [Environment]::GetFolderPath("CommonDesktopDirectory")
-    $uninstallKey = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\WinTaskbarMonitor"
+    $uninstallKey = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Win11TaskbarMonitor"
 } else {
-    $installDir = "$env:LOCALAPPDATA\Programs\WinTaskbarMonitor"
+    $installDir = "$env:LOCALAPPDATA\Programs\Win11TaskbarMonitor"
     $startMenuDir = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs"
     $desktopPath = [Environment]::GetFolderPath("Desktop")
-    $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\WinTaskbarMonitor"
+    $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Win11TaskbarMonitor"
 }
 
-$targetExe = "$installDir\WinTaskbarMonitor.exe"
+$targetExe = "$installDir\Win11TaskbarMonitor.exe"
 $targetUninstallScript = "$installDir\uninstall.ps1"
 
 Write-Host "`n[*] Installing to ($Scope): $installDir" -ForegroundColor Gray
 
 # 2. Stop running instances if any
-$running = Get-Process -Name "WinTaskbarMonitor" -ErrorAction SilentlyContinue
+$running = Get-Process | Where-Object { $_.ProcessName -match "Win11TaskbarMonitor|WinTaskbarMonitor" }
 if ($running) {
     Write-Host "[*] Stopping running instance..." -ForegroundColor Yellow
     $running | Stop-Process -Force
@@ -85,8 +85,12 @@ if (Test-Path $icoSource) {
 }
 Write-Host "[+] Copied executable, icon, runner daemon, and uninstaller" -ForegroundColor Green
 
+# Remove legacy WinTaskbarMonitor shortcuts if present
+Remove-Item "$startMenuDir\WinTaskbarMonitor.lnk" -ErrorAction SilentlyContinue
+Remove-Item "$desktopPath\WinTaskbarMonitor.lnk" -ErrorAction SilentlyContinue
+
 # 4. Create Start Menu Shortcut (Using silent runner to prevent SAC policy blocks)
-$shortcutPath = "$startMenuDir\WinTaskbarMonitor.lnk"
+$shortcutPath = "$startMenuDir\Win11TaskbarMonitor.lnk"
 $wshShell = New-Object -ComObject WScript.Shell
 $shortcut = $wshShell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = "powershell.exe"
@@ -99,7 +103,7 @@ Write-Host "[+] Created Start Menu shortcut in $startMenuDir" -ForegroundColor G
 
 # 5. Optional Desktop Shortcut
 if ($CreateDesktopShortcut) {
-    $desktopShortcut = "$desktopPath\WinTaskbarMonitor.lnk"
+    $desktopShortcut = "$desktopPath\Win11TaskbarMonitor.lnk"
     $scDesktop = $wshShell.CreateShortcut($desktopShortcut)
     $scDesktop.TargetPath = "powershell.exe"
     $scDesktop.Arguments = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
@@ -117,8 +121,8 @@ if (!(Test-Path $uninstallKey)) {
 
 $exeSizeKb = [Math]::Round((Get-Item $targetExe).Length / 1KB)
 
-Set-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "WinTaskbarMonitor"
-Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.0.0"
+Set-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "Win11TaskbarMonitor"
+Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.1.3"
 Set-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "slayershark"
 Set-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $installDir
 $displayIcon = if (Test-Path $targetIco) { "$targetIco,0" } else { "$targetExe,0" }
@@ -133,17 +137,17 @@ Write-Host "[+] Registered in Windows Installed Apps" -ForegroundColor Green
 if ($StartWithWindows) {
     $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
     $runVal = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
-    Set-ItemProperty -Path $runKey -Name "WinTaskbarMonitor" -Value $runVal
+    Set-ItemProperty -Path $runKey -Name "Win11TaskbarMonitor" -Value $runVal
     Write-Host "[+] Enabled Start with Windows" -ForegroundColor Green
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Cyan
 Write-Host "          Installation Completed Successfully!            " -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "WinTaskbarMonitor is now installed." -ForegroundColor White
+Write-Host "Win11TaskbarMonitor is now installed." -ForegroundColor White
 Write-Host "Zero-policy runner enables seamless execution without Developer Mode." -ForegroundColor White
 
 if ($LaunchAfterInstall) {
-    Write-Host "`n[*] Launching WinTaskbarMonitor..." -ForegroundColor Yellow
+    Write-Host "`n[*] Launching Win11TaskbarMonitor..." -ForegroundColor Yellow
     Start-Process powershell.exe -ArgumentList "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
 }
