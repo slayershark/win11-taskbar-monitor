@@ -5,17 +5,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [Unreleased]
+## [1.0.0] - 2026-11-15
 
 ### Added
-- **Initial Technical Documentation Foundation**:
-  - `AGENTS.md`: Permanent coding standards, architectural rules, and guidelines for coding agents.
-  - `PROJECT_BRIEF.md`: Complete product requirements, user experience guidelines, and final acceptance criteria.
-  - `ARCHITECTURE.md`: In-depth technical architecture describing the hardware polling pipeline, Windows 11 taskbar anchor engine, and UI presentation layer.
-  - `TASK_PLAN.md`: 11-phase implementation roadmap with verifiable task criteria.
-  - `CONTEXT.md`: Persistent project state, environment details, and execution context.
-  - `TEST_PLAN.md`: Comprehensive quality assurance and verification plan covering functional, visual, and performance benchmarks.
-  - `.gitignore`: Configured for C#, .NET 8, WPF, and Windows builds.
-- **Development Toolchain Setup**:
-  - Installed user-level .NET 8 SDK (version 8.0.428) in `%LOCALAPPDATA%\dotnet`.
-  - Configured repository-specific Git identity: `slayershark <sandeepsuwal9@gmail.com>`.
+- **Core Hardware Monitoring Pipeline**:
+  - `CpuMonitorProvider`: Zero-allocation Win32 `GetSystemTimes` tracking total system CPU percentage with microsecond resolution.
+  - `MemoryMonitorProvider`: Win32 `GlobalMemoryStatusEx` calculating exact physical memory usage (GB used, total GB, and percentage).
+  - `NvmlInterop` & `GpuMonitorProvider`: Direct P/Invoke interface to NVIDIA Management Library (`nvml.dll`) and LibreHardwareMonitorLib for Intel Iris Xe and AMD graphics.
+  - `CpuTemperatureProvider`: Temperature querying with graceful `N/A` degradation in unprivileged user mode and ACPI thermal fallback.
+  - `HardwareMonitorCoordinator`: Background thread-pool polling service with configurable refresh intervals (500ms, 1s, 2s, 5s).
+- **Windows 11 Taskbar Integration Engine**:
+  - `TaskbarAnchorEngine`: Win32 AppBar integration using `SHAppBarMessage(ABM_GETTASKBARPOS)` to anchor widget alongside `TrayNotifyWnd`.
+  - Windows messages handling: `WM_DISPLAYCHANGE`, `WM_DPICHANGED`, and `"TaskbarCreated"` for instantaneous recovery after Explorer restarts.
+  - Window extended styles: `WS_EX_TOOLWINDOW` (excluded from Alt+Tab), `WS_EX_NOACTIVATE` (no focus stealing), `WS_EX_TOPMOST`.
+  - Taskbar auto-hide tracking via `ABM_GETSTATE` adjusting widget opacity synchronously.
+- **Fluent UI & Visual Design**:
+  - `MainWindow.xaml`: Minimalist horizontal widget matching Windows 11 aesthetics.
+  - OpenType `Typography.NumeralAlignment="Tabular"` in Segoe UI Variable to guarantee rock-solid text stability without horizontal jitter.
+  - `ThemeManager`: Automatic detection of Windows dark/light app theme via registry `AppsUseLightTheme` with manual Dark/Light overrides.
+  - Status alert color thresholds: Amber for elevated load (>75%) and Coral Red for critical load (≥90%).
+  - Rich hover tooltips providing hardware model names, exact memory numbers, and temperature warnings.
+  - Full right-click context menu for rapid switching of refresh rates, temperature units, themes, settings, and application exit.
+- **Settings & Persistence Engine**:
+  - `SettingsWindow.xaml` & `SettingsViewModel`: Fluent-styled configuration window for metric visibility, GPU selection, font size, alignment, and auto-start.
+  - `SettingsService`: Auto-saves configuration to `%APPDATA%\WinTaskbarMonitor\settings.json` with recovery from corrupted files.
+  - "Start with Windows" toggle via non-elevated `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+  - Single-instance enforcement via named system mutex (`WinTaskbarMonitor_SingleInstance_Mutex`).
+- **Packaging & Testing**:
+  - Compiled and published standalone single-file x64 executable to `dist/WinTaskbarMonitor.exe` (3.70 MB).
+  - Test suite in `tests/WinTaskbarMonitor.Tests` covering monitoring providers and settings serialization.
+  - Complete project documentation suite: `AGENTS.md`, `PROJECT_BRIEF.md`, `ARCHITECTURE.md`, `TASK_PLAN.md`, `CONTEXT.md`, `CHANGELOG.md`, `TEST_PLAN.md`, `README.md`.
