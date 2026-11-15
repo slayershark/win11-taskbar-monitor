@@ -21,7 +21,7 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `6a084db` (test: add automated test runner for hardware telemetry and settings)
+  - Latest Commit: `b30f2fd` (feat: add one-click installer, uninstaller, and Start Menu integration)
 
 ---
 
