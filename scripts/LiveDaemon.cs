@@ -65,16 +65,16 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         [DllImport("nvml.dll", EntryPoint = "nvmlShutdown")]
         public static extern int nvmlShutdown();
 
-        [DllImport("pdh.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        [DllImport("pdh.dll", EntryPoint = "PdhOpenQueryW", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern int PdhOpenQuery(string szDataSource, IntPtr dwUserData, out IntPtr phQuery);
 
-        [DllImport("pdh.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        [DllImport("pdh.dll", EntryPoint = "PdhAddEnglishCounterW", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern int PdhAddEnglishCounter(IntPtr hQuery, string szFullCounterPath, IntPtr dwUserData, out IntPtr phCounter);
 
         [DllImport("pdh.dll", SetLastError = true)]
         public static extern int PdhCollectQueryData(IntPtr hQuery);
 
-        [DllImport("pdh.dll", SetLastError = true)]
+        [DllImport("pdh.dll", EntryPoint = "PdhGetFormattedCounterArrayW", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern int PdhGetFormattedCounterArray(IntPtr hCounter, uint dwFormat, ref uint lpdwBufferSize, ref uint lpdwItemCount, IntPtr ItemBuffer);
 
         [StructLayout(LayoutKind.Explicit, Size = 16)]
@@ -320,7 +320,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                 IntPtr mainHwnd = IntPtr.Zero;
 
-                DispatcherTimer timer = new DispatcherTimer();
+                DispatcherTimer timer = new DispatcherTimer(DispatcherPriority.Normal);
                 timer.Interval = TimeSpan.FromSeconds(1);
                 timer.Tick += (s, e) => {
                     try {
@@ -377,22 +377,25 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                                         if (PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, pBuf) == 0) {
                                             Dictionary<int, double> pidMax = new Dictionary<int, double>();
                                             for (int idx = 0; idx < count; idx++) {
-                                                IntPtr itemPtr = new IntPtr(pBuf.ToInt64() + idx * 24);
-                                                double val = (double)Marshal.PtrToStructure(new IntPtr(pBuf.ToInt64() + idx * 24 + 16), typeof(double));
-                                                if (val > 0.01) {
-                                                    IntPtr szName = Marshal.ReadIntPtr(itemPtr, 0);
-                                                    string name = Marshal.PtrToStringUni(szName);
-                                                    int pid = 0;
-                                                    if (name != null && name.StartsWith("pid_")) {
-                                                        int under = name.IndexOf('_', 4);
-                                                        if (under > 4) {
-                                                            int.TryParse(name.Substring(4, under - 4), out pid);
+                                                long baseOff = pBuf.ToInt64() + idx * 24;
+                                                uint status = (uint)Marshal.ReadInt32(new IntPtr(baseOff + 8));
+                                                if (status == 0) {
+                                                    double val = BitConverter.ToDouble(BitConverter.GetBytes(Marshal.ReadInt64(new IntPtr(baseOff + 16))), 0);
+                                                    if (!double.IsNaN(val) && !double.IsInfinity(val) && val > 0.01) {
+                                                        IntPtr szName = Marshal.ReadIntPtr(new IntPtr(baseOff), 0);
+                                                        string name = Marshal.PtrToStringUni(szName);
+                                                        int pid = 0;
+                                                        if (name != null && name.StartsWith("pid_")) {
+                                                            int under = name.IndexOf('_', 4);
+                                                            if (under > 4) {
+                                                                int.TryParse(name.Substring(4, under - 4), out pid);
+                                                            }
                                                         }
-                                                    }
-                                                    if (pidMax.ContainsKey(pid)) {
-                                                        if (val > pidMax[pid]) pidMax[pid] = val;
-                                                    } else {
-                                                        pidMax[pid] = val;
+                                                        if (pidMax.ContainsKey(pid)) {
+                                                            if (val > pidMax[pid]) pidMax[pid] = val;
+                                                        } else {
+                                                            pidMax[pid] = val;
+                                                        }
                                                     }
                                                 }
                                             }

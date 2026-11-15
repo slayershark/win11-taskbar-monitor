@@ -10,7 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 - **Real-Time Synchronization with Windows Task Manager**:
   - **CPU Metric Parity**: Switched CPU metric from legacy unscaled `GetSystemTimes` (`% Processor Time`) to Windows Performance Data Helper (`\Processor Information(_Total)\% Processor Utility`), matching Windows Task Manager's exact frequency-scaled processor utility with defensive fallback.
-  - **Multi-GPU Dynamic Engine Aggregation**: Resolved dual-GPU discrepancy where integrated GPUs (e.g. Intel Iris Xe / AMD Radeon) handling active desktop rendering showed 0% GPU usage because only idling discrete NVIDIA cards were queried. Implemented real-time WDDM engine aggregation via PDH `\GPU Engine(*)\Utilization Percentage` across all active applications and GPUs.
+  - **Multi-GPU Dynamic Engine Aggregation & Unicode P/Invoke**: Fixed PDH GPU counter array parsing by explicitly binding `PdhGetFormattedCounterArrayW` with Unicode string marshaling, resolving Chinese mojibake corruption that previously prevented engine-to-PID grouping and caused integrated GPU activity to remain stuck at 0%.
+  - **Counter Status Verification**: Added strict `CStatus == 0` validation at byte offset +8 before reading formatted double values at byte offset +16.
+  - **Timer Frequency Precision**: Configured widget timer with `DispatcherPriority.Normal` to ensure rock-solid 1-second cadence without drift.
   - **Preserved Hardware Thermals**: Retained direct NVML driver queries for discrete NVIDIA GPU temperature and heavy CUDA/3D load.
   - **Full Codebase Parity**: Updated both the lightweight runner `scripts/LiveDaemon.cs` and compiled engine classes (`CpuMonitorProvider.cs`, `GpuMonitorProvider.cs`, and `HardwareMonitorCoordinator.cs`).
   - **Universal Distribution Refreshed**: Recompiled `dist/Win11TaskbarMonitor.exe` and rebuilt `dist/Win11TaskbarMonitor-Setup.zip` with the real-time synchronization engine.

@@ -19,20 +19,20 @@ public sealed class CpuMonitorProvider : IDisposable
     private static extern bool GetSystemTimes(out FILETIME lpIdleTime, out FILETIME lpKernelTime, out FILETIME lpUserTime);
 
     // PDH APIs for Windows Task Manager % Processor Utility
-    [DllImport("pdh.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [DllImport("pdh.dll", EntryPoint = "PdhOpenQueryW", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern int PdhOpenQuery(string? szDataSource, IntPtr dwUserData, out IntPtr phQuery);
 
-    [DllImport("pdh.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [DllImport("pdh.dll", EntryPoint = "PdhAddEnglishCounterW", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern int PdhAddEnglishCounter(IntPtr hQuery, string szFullCounterPath, IntPtr dwUserData, out IntPtr phCounter);
 
     [DllImport("pdh.dll", SetLastError = true)]
     private static extern int PdhCollectQueryData(IntPtr hQuery);
 
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Explicit, Size = 16)]
     private struct PDH_FMT_COUNTERVALUE
     {
-        public uint CStatus;
-        public double doubleValue;
+        [FieldOffset(0)] public uint CStatus;
+        [FieldOffset(8)] public double doubleValue;
     }
 
     [DllImport("pdh.dll", SetLastError = true)]

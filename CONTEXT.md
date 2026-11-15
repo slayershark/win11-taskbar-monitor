@@ -30,8 +30,11 @@
 - [x] **Real-Time Synchronization with Windows Task Manager**:
   - Switched CPU calculation from legacy unscaled `GetSystemTimes` (`% Processor Time`) to Windows Performance Data Helper (`\Processor Information(_Total)\% Processor Utility`), matching Windows Task Manager's turbo/frequency-scaled CPU calculation with defensive fallback.
   - Implemented multi-GPU aggregation via `\GPU Engine(*)\Utilization Percentage` across all graphics adapters (Intel Iris Xe / integrated, AMD Radeon, NVIDIA GeForce), eliminating the issue where desktop activity on integrated GPU showed 0% while discrete GPU was idling.
+  - Fixed PDH counter array marshaling via explicit `PdhGetFormattedCounterArrayW` Unicode P/Invoke with UTF-16 instance string decoding, correcting Chinese mojibake corruption that previously prevented engine grouping by PID.
+  - Added strict `CStatus == 0` validation at byte offset +8 before reading double values at byte offset +16.
   - Retained dedicated NVML hardware polling for discrete NVIDIA GPU temperature and heavy 3D/CUDA loads.
   - Updated both `scripts/LiveDaemon.cs` and compiled providers `CpuMonitorProvider.cs`, `GpuMonitorProvider.cs`, and `HardwareMonitorCoordinator.cs`.
+  - Verified live on desktop in `verified_sync_proof.png` showing `CPU: 15% | GPU: 5% | GPU°: 57°C | RAM: 90%` in real-time alignment with Task Manager.
 - [x] **Universal Standalone Setup Package for Any Windows Machine**:
   - Created automated build tool `scripts/Build-ReleasePackage.ps1` producing `dist/Win11TaskbarMonitor-Setup.zip` (1.65 MB).
   - Works on any clean Windows 11 or Windows 10 PC out-of-the-box with **zero prerequisites**, no .NET SDK required, and no developer tools.

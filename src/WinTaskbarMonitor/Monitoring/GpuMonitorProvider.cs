@@ -10,16 +10,16 @@ namespace WinTaskbarMonitor.Monitoring;
 public sealed class GpuMonitorProvider : IDisposable
 {
     // PDH APIs for Windows Task Manager GPU engine metrics
-    [DllImport("pdh.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [DllImport("pdh.dll", EntryPoint = "PdhOpenQueryW", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern int PdhOpenQuery(string? szDataSource, IntPtr dwUserData, out IntPtr phQuery);
 
-    [DllImport("pdh.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [DllImport("pdh.dll", EntryPoint = "PdhAddEnglishCounterW", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern int PdhAddEnglishCounter(IntPtr hQuery, string szFullCounterPath, IntPtr dwUserData, out IntPtr phCounter);
 
     [DllImport("pdh.dll", SetLastError = true)]
     private static extern int PdhCollectQueryData(IntPtr hQuery);
 
-    [DllImport("pdh.dll", SetLastError = true)]
+    [DllImport("pdh.dll", EntryPoint = "PdhGetFormattedCounterArrayW", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern int PdhGetFormattedCounterArray(IntPtr hCounter, uint dwFormat, ref uint lpdwBufferSize, ref uint lpdwItemCount, IntPtr ItemBuffer);
 
     [DllImport("pdh.dll", SetLastError = true)]
@@ -218,28 +218,32 @@ public sealed class GpuMonitorProvider : IDisposable
                                 var pidMax = new Dictionary<int, double>();
                                 for (int idx = 0; idx < count; idx++)
                                 {
-                                    IntPtr itemPtr = new IntPtr(pBuf.ToInt64() + idx * 24);
-                                    double val = Marshal.PtrToStructure<double>(new IntPtr(pBuf.ToInt64() + idx * 24 + 16));
-                                    if (val > 0.01)
+                                    long baseOff = pBuf.ToInt64() + idx * 24;
+                                    uint status = (uint)Marshal.ReadInt32(new IntPtr(baseOff + 8));
+                                    if (status == 0)
                                     {
-                                        IntPtr szName = Marshal.ReadIntPtr(itemPtr, 0);
-                                        string? name = Marshal.PtrToStringUni(szName);
-                                        int pid = 0;
-                                        if (name != null && name.StartsWith("pid_"))
+                                        double val = BitConverter.ToDouble(BitConverter.GetBytes(Marshal.ReadInt64(new IntPtr(baseOff + 16))), 0);
+                                        if (!double.IsNaN(val) && !double.IsInfinity(val) && val > 0.01)
                                         {
-                                            int under = name.IndexOf('_', 4);
-                                            if (under > 4)
+                                            IntPtr szName = Marshal.ReadIntPtr(new IntPtr(baseOff), 0);
+                                            string? name = Marshal.PtrToStringUni(szName);
+                                            int pid = 0;
+                                            if (name != null && name.StartsWith("pid_"))
                                             {
-                                                int.TryParse(name.Substring(4, under - 4), out pid);
+                                                int under = name.IndexOf('_', 4);
+                                                if (under > 4)
+                                                {
+                                                    int.TryParse(name.Substring(4, under - 4), out pid);
+                                                }
                                             }
-                                        }
-                                        if (pidMax.TryGetValue(pid, out var existing))
-                                        {
-                                            if (val > existing) pidMax[pid] = val;
-                                        }
-                                        else
-                                        {
-                                            pidMax[pid] = val;
+                                            if (pidMax.TryGetValue(pid, out var existing))
+                                            {
+                                                if (val > existing) pidMax[pid] = val;
+                                            }
+                                            else
+                                            {
+                                                pidMax[pid] = val;
+                                            }
                                         }
                                     }
                                 }
