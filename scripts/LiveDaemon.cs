@@ -77,10 +77,10 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         [DllImport("pdh.dll", SetLastError = true)]
         public static extern int PdhGetFormattedCounterArray(IntPtr hCounter, uint dwFormat, ref uint lpdwBufferSize, ref uint lpdwItemCount, IntPtr ItemBuffer);
 
-        [StructLayout(LayoutKind.Sequential)]
+        [StructLayout(LayoutKind.Explicit, Size = 16)]
         public struct PDH_FMT_COUNTERVALUE {
-            public uint CStatus;
-            public double doubleValue;
+            [FieldOffset(0)] public uint CStatus;
+            [FieldOffset(8)] public double doubleValue;
         }
 
         [DllImport("pdh.dll", SetLastError = true)]
@@ -142,15 +142,6 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         public static void Launch(int posX, string capPath) {
             IntPtr hDesk = OpenDesktop("Default", 0, false, 0x01FF);
             GetSystemTimes(out _pIdle, out _pKernel, out _pUser);
-
-            try {
-                if (PdhOpenQuery(null, IntPtr.Zero, out _hPdhQuery) == 0) {
-                    PdhAddEnglishCounter(_hPdhQuery, @"\Processor Information(_Total)\% Processor Utility", IntPtr.Zero, out _hCpuCounter);
-                    PdhAddEnglishCounter(_hPdhQuery, @"\GPU Engine(*)\Utilization Percentage", IntPtr.Zero, out _hGpuCounter);
-                    PdhCollectQueryData(_hPdhQuery);
-                    _hasPdh = true;
-                }
-            } catch {}
 
             try {
                 if (nvmlInit_v2() == 0) {
@@ -333,8 +324,9 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 timer.Interval = TimeSpan.FromSeconds(1);
                 timer.Tick += (s, e) => {
                     try {
+                        int pdhCollectRes = -999;
                         if (_hasPdh) {
-                            try { PdhCollectQueryData(_hPdhQuery); } catch {}
+                            try { pdhCollectRes = PdhCollectQueryData(_hPdhQuery); } catch {}
                         }
 
                         // 1. CPU Utilization (matches Task Manager % Processor Utility)
@@ -363,12 +355,12 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                         txtCpu.Foreground = pct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : pct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
 
                         // 2. RAM Utilization
-                        double totGb = 0, usedGb = 0;
+                        double totGb = 0, usedGb = 0, rPct = 0;
                         MEMORYSTATUSEX mem = new MEMORYSTATUSEX();
                         if (GlobalMemoryStatusEx(mem)) {
                             totGb = mem.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
                             usedGb = (mem.ullTotalPhys - mem.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
-                            double rPct = totGb > 0 ? (usedGb / totGb) * 100.0 : 0;
+                            rPct = totGb > 0 ? (usedGb / totGb) * 100.0 : 0;
                             txtRam.Text = Math.Round(rPct) + "%";
                             txtRam.Foreground = rPct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : rPct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
                         }
@@ -433,6 +425,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                         gpuPct = Math.Max(0.0, Math.Min(100.0, gpuPct));
                         txtGpu.Text = Math.Round(gpuPct) + "%";
                         txtGpu.Foreground = gpuPct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : gpuPct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
+
 
                         // Smart Auto-Detection: CPU Temperature
                         double? cpuT = QueryCpuTemp();
@@ -501,6 +494,15 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                         win.Left = rTray.Left + sm;
                         win.Top = rTray.Top + sm;
                     }
+
+                    try {
+                        if (PdhOpenQuery(null, IntPtr.Zero, out _hPdhQuery) == 0) {
+                            PdhAddEnglishCounter(_hPdhQuery, @"\Processor Information(_Total)\% Processor Utility", IntPtr.Zero, out _hCpuCounter);
+                            PdhAddEnglishCounter(_hPdhQuery, @"\GPU Engine(*)\Utilization Percentage", IntPtr.Zero, out _hGpuCounter);
+                            PdhCollectQueryData(_hPdhQuery);
+                            _hasPdh = true;
+                        }
+                    } catch {}
 
                     timer.Start();
 
