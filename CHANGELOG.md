@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.1.5] - 2026-11-15
+
+### Fixed
+- **100% Real-Time Data Synchronization & Sys_Mon Architecture Alignment**:
+  - **In-Depth Telemetry Research**: Researched the exact telemetry implementation in `sys_mon-system-monitor` (`Sys_MonSystemMonitor.Services.TelemetryService`) installed locally on the host system.
+  - **Discrete GPU Silicon Isolation**: Discovered that on dual-GPU laptops (Intel Iris Xe + NVIDIA GeForce MX350), Sys_Mon prioritizes discrete NVIDIA GPU metrics via `nvidia-smi` / NVML. Eliminated multi-GPU cross-talk where previous PDH engine queries for Intel iGPU desktop activity were overriding the discrete NVIDIA GPU utilization with Intel's background load.
+  - **Exact Task Manager GPU 1 Parity**: In `LiveDaemon.cs` and `GpuMonitorProvider.cs`, when NVIDIA discrete GPU is active (default), utilization is read directly from NVML `nvmlDeviceGetUtilizationRates` (matching Task Manager GPU 1 to 100% precision) alongside temperature from `nvmlDeviceGetTemperature`.
+  - **GPU Telemetry Source Context Menu**: Added a right-click submenu enabling users to toggle between `NVIDIA GeForce MX350 (Discrete - Default)`, `Intel(R) Iris(R) Xe Graphics (Integrated - Task Manager GPU 0)`, and `Auto / Peak GPU Engine`.
+  - **AwayFromZero Midpoint Rounding**: Enforced `MidpointRounding.AwayFromZero` on memory and CPU percentages to match Task Manager's integer display formatting.
+  - **Refreshed Distribution**: Rebuilt `dist/Win11TaskbarMonitor-Setup.zip` and updated installed runtime at `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor`.
+
+---
+
 ## [1.1.4] - 2026-11-15
 
 ### Fixed

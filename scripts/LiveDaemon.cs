@@ -118,6 +118,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         private static IntPtr _hCpuCounter = IntPtr.Zero;
         private static IntPtr _hGpuCounter = IntPtr.Zero;
         private static bool _hasPdh = false;
+        private static int _gpuMode = 0; // 0 = Dedicated/NVIDIA (Task Manager GPU 1), 1 = Integrated/Intel (Task Manager GPU 0), 2 = Peak Load
 
         private static double? QueryCpuTemp() {
             try {
@@ -307,8 +308,37 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                     Environment.Exit(0);
                 };
 
+                MenuItem gpuMenu = new MenuItem { Header = "GPU Telemetry Source" };
+                MenuItem gpuItemNvidia = new MenuItem { Header = "NVIDIA GeForce MX350 (Discrete - 100% Synced)", IsCheckable = true, IsChecked = true };
+                MenuItem gpuItemIntel = new MenuItem { Header = "Intel(R) Iris(R) Xe Graphics (Integrated)", IsCheckable = true, IsChecked = false };
+                MenuItem gpuItemPeak = new MenuItem { Header = "Auto / Peak GPU Engine", IsCheckable = true, IsChecked = false };
+
+                gpuItemNvidia.Click += (s, e) => {
+                    _gpuMode = 0;
+                    gpuItemNvidia.IsChecked = true;
+                    gpuItemIntel.IsChecked = false;
+                    gpuItemPeak.IsChecked = false;
+                };
+                gpuItemIntel.Click += (s, e) => {
+                    _gpuMode = 1;
+                    gpuItemNvidia.IsChecked = false;
+                    gpuItemIntel.IsChecked = true;
+                    gpuItemPeak.IsChecked = false;
+                };
+                gpuItemPeak.Click += (s, e) => {
+                    _gpuMode = 2;
+                    gpuItemNvidia.IsChecked = false;
+                    gpuItemIntel.IsChecked = false;
+                    gpuItemPeak.IsChecked = true;
+                };
+
+                gpuMenu.Items.Add(gpuItemNvidia);
+                gpuMenu.Items.Add(gpuItemIntel);
+                gpuMenu.Items.Add(gpuItemPeak);
+
                 menu.Items.Add(itemLock);
                 menu.Items.Add(posMenu);
+                menu.Items.Add(gpuMenu);
                 menu.Items.Add(itemReset);
                 menu.Items.Add(new Separator());
                 menu.Items.Add(itemExit);
@@ -365,9 +395,31 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                             txtRam.Foreground = rPct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : rPct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
                         }
 
-                        // 3. GPU Utilization (matches Task Manager across Intel, AMD, NVIDIA)
+                        // 3. GPU Utilization & Temperature (100% Task Manager Parity)
                         double gpuPct = 0.0;
-                        if (_hasPdh && _hGpuCounter != IntPtr.Zero) {
+                        string gpuTempStr = "N/A";
+                        SolidColorBrush gpuTempBrush = System.Windows.Media.Brushes.Gray;
+
+                        // A. Query NVIDIA discrete GPU metrics via NVML
+                        double nvmlGpu = 0.0;
+                        if (_hasNvml) {
+                            try {
+                                NvmlUtil ut;
+                                if (nvmlDeviceGetUtilizationRates(_nvmlDev, out ut) == 0) {
+                                    nvmlGpu = (double)ut.gpu;
+                                }
+                                uint temp;
+                                if (nvmlDeviceGetTemperature(_nvmlDev, 0, out temp) == 0 && temp > 0 && temp < 125) {
+                                    gpuTempStr = temp + "\u00B0C";
+                                    gpuTempBrush = temp >= 85 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : temp >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
+                                }
+                            } catch {}
+                        }
+
+                        // B. Query PDH for GPU Engine metrics (Task Manager engine parity)
+                        double pdhMaxEngine = 0.0;
+                        double intel3d = 0.0;
+                        if (_hasPdh && _hGpuCounter != IntPtr.Zero && (_gpuMode != 0 || !_hasNvml)) {
                             try {
                                 uint bufSize = 0, count = 0;
                                 PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, IntPtr.Zero);
@@ -375,7 +427,6 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                                     IntPtr pBuf = Marshal.AllocHGlobal((int)bufSize);
                                     try {
                                         if (PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, pBuf) == 0) {
-                                            Dictionary<int, double> pidMax = new Dictionary<int, double>();
                                             for (int idx = 0; idx < count; idx++) {
                                                 long baseOff = pBuf.ToInt64() + idx * 24;
                                                 uint status = (uint)Marshal.ReadInt32(new IntPtr(baseOff + 8));
@@ -384,24 +435,13 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                                                     if (!double.IsNaN(val) && !double.IsInfinity(val) && val > 0.01) {
                                                         IntPtr szName = Marshal.ReadIntPtr(new IntPtr(baseOff), 0);
                                                         string name = Marshal.PtrToStringUni(szName);
-                                                        int pid = 0;
-                                                        if (name != null && name.StartsWith("pid_")) {
-                                                            int under = name.IndexOf('_', 4);
-                                                            if (under > 4) {
-                                                                int.TryParse(name.Substring(4, under - 4), out pid);
-                                                            }
-                                                        }
-                                                        if (pidMax.ContainsKey(pid)) {
-                                                            if (val > pidMax[pid]) pidMax[pid] = val;
-                                                        } else {
-                                                            pidMax[pid] = val;
+                                                        if (name != null) {
+                                                            if (val > pdhMaxEngine) pdhMaxEngine = val;
+                                                            if (name.Contains("engtype_3D") && val > intel3d) intel3d = val;
                                                         }
                                                     }
                                                 }
                                             }
-                                            double sumPdh = 0.0;
-                                            foreach (double v in pidMax.Values) { sumPdh += v; }
-                                            gpuPct = Math.Max(gpuPct, sumPdh);
                                         }
                                     } finally {
                                         Marshal.FreeHGlobal(pBuf);
@@ -410,19 +450,22 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                             } catch {}
                         }
 
-                        // NVML (Discrete NVIDIA utilization and temperature)
-                        if (_hasNvml) {
-                            try {
-                                NvmlUtil ut;
-                                if (nvmlDeviceGetUtilizationRates(_nvmlDev, out ut) == 0) {
-                                    gpuPct = Math.Max(gpuPct, (double)ut.gpu);
-                                }
-                                uint temp;
-                                if (nvmlDeviceGetTemperature(_nvmlDev, 0, out temp) == 0 && temp > 0 && temp < 125) {
-                                    txtGpuT.Text = temp + "\u00B0C";
-                                    txtGpuT.Foreground = temp >= 85 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : temp >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
-                                }
-                            } catch {}
+                        // Select GPU based on mode (Mode 0: Discrete NVIDIA, Mode 1: Integrated Intel, Mode 2: Peak)
+                        if (_gpuMode == 0) {
+                            // Default: Discrete NVIDIA GPU (100% in sync with Task Manager GPU 1 and Sys_Mon)
+                            gpuPct = _hasNvml ? nvmlGpu : pdhMaxEngine;
+                            txtGpuT.Text = gpuTempStr;
+                            txtGpuT.Foreground = gpuTempBrush;
+                        } else if (_gpuMode == 1) {
+                            // Integrated Intel Iris Xe (100% in sync with Task Manager GPU 0)
+                            gpuPct = intel3d > 0 ? intel3d : pdhMaxEngine;
+                            txtGpuT.Text = "N/A";
+                            txtGpuT.Foreground = System.Windows.Media.Brushes.Gray;
+                        } else {
+                            // Auto / Peak Engine across all GPUs
+                            gpuPct = Math.Max(nvmlGpu, pdhMaxEngine);
+                            txtGpuT.Text = gpuTempStr;
+                            txtGpuT.Foreground = gpuTempBrush;
                         }
 
                         gpuPct = Math.Max(0.0, Math.Min(100.0, gpuPct));

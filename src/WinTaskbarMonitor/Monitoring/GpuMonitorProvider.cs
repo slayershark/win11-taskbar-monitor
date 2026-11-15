@@ -199,8 +199,34 @@ public sealed class GpuMonitorProvider : IDisposable
         double usage = 0.0;
         double? tempC = null;
 
-        // 1. Query PDH for system-wide Task Manager GPU utilization
-        if (_selectedGpuIndex < 0 && _pdhGpuInitialized && _hPdhQuery != IntPtr.Zero && _hGpuCounter != IntPtr.Zero)
+        // 1. Direct NVML for NVIDIA GPUs (100% Task Manager GPU 1 parity)
+        if (dev.Vendor == "NVIDIA" && _nvmlInitialized && _nvmlDeviceHandle != IntPtr.Zero)
+        {
+            try
+            {
+                if (NvmlInterop.nvmlDeviceGetUtilizationRates(_nvmlDeviceHandle, out var util) == NvmlInterop.NVML_SUCCESS)
+                {
+                    usage = (double)util.gpu;
+                }
+
+                if (NvmlInterop.nvmlDeviceGetTemperature(_nvmlDeviceHandle, NvmlInterop.NVML_TEMPERATURE_GPU, out uint t) == NvmlInterop.NVML_SUCCESS)
+                {
+                    if (t > 0 && t < 125)
+                    {
+                        tempC = t;
+                    }
+                }
+
+                return (Math.Clamp(usage, 0.0, 100.0), tempC, dev.Name);
+            }
+            catch
+            {
+                // Fallback to PDH below
+            }
+        }
+
+        // 2. Query PDH for system-wide / iGPU Task Manager GPU utilization
+        if (_pdhGpuInitialized && _hPdhQuery != IntPtr.Zero && _hGpuCounter != IntPtr.Zero)
         {
             try
             {
@@ -215,7 +241,8 @@ public sealed class GpuMonitorProvider : IDisposable
                         {
                             if (PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, pBuf) == 0)
                             {
-                                var pidMax = new Dictionary<int, double>();
+                                double max3d = 0.0;
+                                double maxAny = 0.0;
                                 for (int idx = 0; idx < count; idx++)
                                 {
                                     long baseOff = pBuf.ToInt64() + idx * 24;
@@ -227,29 +254,15 @@ public sealed class GpuMonitorProvider : IDisposable
                                         {
                                             IntPtr szName = Marshal.ReadIntPtr(new IntPtr(baseOff), 0);
                                             string? name = Marshal.PtrToStringUni(szName);
-                                            int pid = 0;
-                                            if (name != null && name.StartsWith("pid_"))
+                                            if (name != null)
                                             {
-                                                int under = name.IndexOf('_', 4);
-                                                if (under > 4)
-                                                {
-                                                    int.TryParse(name.Substring(4, under - 4), out pid);
-                                                }
-                                            }
-                                            if (pidMax.TryGetValue(pid, out var existing))
-                                            {
-                                                if (val > existing) pidMax[pid] = val;
-                                            }
-                                            else
-                                            {
-                                                pidMax[pid] = val;
+                                                if (val > maxAny) maxAny = val;
+                                                if (name.Contains("engtype_3D") && val > max3d) max3d = val;
                                             }
                                         }
                                     }
                                 }
-                                double sum = 0.0;
-                                foreach (var v in pidMax.Values) { sum += v; }
-                                usage = sum;
+                                usage = max3d > 0 ? max3d : maxAny;
                             }
                         }
                         finally
@@ -264,30 +277,6 @@ public sealed class GpuMonitorProvider : IDisposable
                 // Fallback below
             }
         }
-
-        // 2. Try NVML for NVIDIA metrics (temperature and utilization if higher)
-        if (_nvmlInitialized && dev.Vendor == "NVIDIA" && _nvmlDeviceHandle != IntPtr.Zero)
-        {
-            try
-            {
-                if (NvmlInterop.nvmlDeviceGetUtilizationRates(_nvmlDeviceHandle, out var util) == NvmlInterop.NVML_SUCCESS)
-                {
-                    usage = Math.Max(usage, (double)util.gpu);
-                }
-
-                if (NvmlInterop.nvmlDeviceGetTemperature(_nvmlDeviceHandle, NvmlInterop.NVML_TEMPERATURE_GPU, out uint t) == NvmlInterop.NVML_SUCCESS)
-                {
-                    if (t > 0 && t < 125)
-                    {
-                        tempC = t;
-                    }
-                }
-
-                if (usage > 0 || tempC.HasValue)
-                {
-                    return (Math.Clamp(usage, 0.0, 100.0), tempC, dev.Name);
-                }
-            }
             catch
             {
                 // Fallback to LHM below
