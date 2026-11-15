@@ -139,7 +139,7 @@ if (!(Test-Path $uninstallKey)) {
 $exeSizeKb = [Math]::Round((Get-Item $targetExe).Length / 1KB)
 
 Set-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "Win11TaskbarMonitor"
-Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.1.3"
+Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.1.6"
 Set-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "slayershark"
 Set-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $installDir
 $displayIcon = if (Test-Path $targetIco) { "$targetIco,0" } else { "$targetExe,0" }
