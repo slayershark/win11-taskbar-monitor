@@ -21,7 +21,7 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `2b58650` (style: scale metric label typography from 8.5pt to 10.0pt for improved legibility)
+  - Latest Commit: `e671fd0` (feat: rebrand application to Win11TaskbarMonitor across codebase, assets, and installer)
 
 ---
 
