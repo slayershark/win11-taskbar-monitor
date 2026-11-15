@@ -1,5 +1,7 @@
 @echo off
 setlocal
-echo Installing WinTaskbarMonitor...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install.ps1" -CreateDesktopShortcut
-pause
+echo ==========================================================
+echo        Installing WinTaskbarMonitor to Program Files...
+echo ==========================================================
+echo.
+powershell.exe -NoProfile -Command "Start-Process powershell.exe -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"\"%~dp0scripts\install.ps1\"\" -Scope AllUsers -CreateDesktopShortcut -StartWithWindows -LaunchAfterInstall' -Verb RunAs"
