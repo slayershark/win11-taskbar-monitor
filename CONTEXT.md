@@ -21,7 +21,7 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `641ab50` (fix: switch CPU counter to Processor Time to match Windows 11 Task Manager exactly)
+  - Latest Commit: `ff82863` (fix: enforce AwayFromZero integer rounding to match Task Manager display exactly)
 
 ---
 
