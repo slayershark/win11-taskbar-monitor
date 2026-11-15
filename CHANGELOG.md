@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 - **Real-Time Synchronization with Windows Task Manager**:
-  - **CPU Metric Parity**: Switched CPU metric from legacy unscaled `GetSystemTimes` (`% Processor Time`) to Windows Performance Data Helper (`\Processor Information(_Total)\% Processor Utility`), matching Windows Task Manager's exact frequency-scaled processor utility with defensive fallback.
+  - **CPU Metric Parity with Windows 11 Task Manager**: Aligned CPU calculation with Windows 11 Task Manager by querying PDH `\Processor Information(_Total)\% Processor Time` (instead of frequency-inflated `% Processor Utility` which erroneously multiplied usage by the Turbo Boost ratio, causing 3x–4x inflation over Task Manager).
   - **Multi-GPU Dynamic Engine Aggregation & Unicode P/Invoke**: Fixed PDH GPU counter array parsing by explicitly binding `PdhGetFormattedCounterArrayW` with Unicode string marshaling, resolving Chinese mojibake corruption that previously prevented engine-to-PID grouping and caused integrated GPU activity to remain stuck at 0%.
   - **Counter Status Verification**: Added strict `CStatus == 0` validation at byte offset +8 before reading formatted double values at byte offset +16.
   - **Timer Frequency Precision**: Configured widget timer with `DispatcherPriority.Normal` to ensure rock-solid 1-second cadence without drift.

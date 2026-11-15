@@ -63,7 +63,7 @@ public sealed class CpuMonitorProvider : IDisposable
         {
             if (PdhOpenQuery(null, IntPtr.Zero, out _hPdhQuery) == 0)
             {
-                if (PdhAddEnglishCounter(_hPdhQuery, @"\Processor Information(_Total)\% Processor Utility", IntPtr.Zero, out _hCpuCounter) == 0)
+                if (PdhAddEnglishCounter(_hPdhQuery, @"\Processor Information(_Total)\% Processor Time", IntPtr.Zero, out _hCpuCounter) == 0)
                 {
                     PdhCollectQueryData(_hPdhQuery);
                     _pdhInitialized = true;

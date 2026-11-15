@@ -500,7 +500,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                     try {
                         if (PdhOpenQuery(null, IntPtr.Zero, out _hPdhQuery) == 0) {
-                            PdhAddEnglishCounter(_hPdhQuery, @"\Processor Information(_Total)\% Processor Utility", IntPtr.Zero, out _hCpuCounter);
+                            PdhAddEnglishCounter(_hPdhQuery, @"\Processor Information(_Total)\% Processor Time", IntPtr.Zero, out _hCpuCounter);
                             PdhAddEnglishCounter(_hPdhQuery, @"\GPU Engine(*)\Utilization Percentage", IntPtr.Zero, out _hGpuCounter);
                             PdhCollectQueryData(_hPdhQuery);
                             _hasPdh = true;
