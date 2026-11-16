@@ -277,11 +277,6 @@ public sealed class GpuMonitorProvider : IDisposable
                 // Fallback below
             }
         }
-            catch
-            {
-                // Fallback to LHM below
-            }
-        }
 
         // 3. LibreHardwareMonitor query
         if (_lhmSelectedGpu != null)

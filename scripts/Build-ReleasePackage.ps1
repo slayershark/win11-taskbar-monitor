@@ -19,6 +19,7 @@ New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
 Copy-Item "$distDir\Win11TaskbarMonitor.exe" "$packageDir\Win11TaskbarMonitor.exe" -Force
 Copy-Item "$PSScriptRoot\Run-WinTaskbarMonitor.ps1" "$packageDir\Run-WinTaskbarMonitor.ps1" -Force
 Copy-Item "$PSScriptRoot\LiveDaemon.cs" "$packageDir\LiveDaemon.cs" -Force
+Copy-Item "$PSScriptRoot\Launch-Silent.vbs" "$packageDir\Launch-Silent.vbs" -Force
 Copy-Item "$PSScriptRoot\install.ps1" "$packageDir\install.ps1" -Force
 Copy-Item "$PSScriptRoot\uninstall.ps1" "$packageDir\uninstall.ps1" -Force
 Copy-Item "$PSScriptRoot\..\assets\app.ico" "$packageDir\app.ico" -Force
@@ -61,7 +62,7 @@ $runCmd = @"
 setlocal
 cd /d "%~dp0"
 title Win11TaskbarMonitor
-start "" powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0Run-WinTaskbarMonitor.ps1"
+start "" wscript.exe "%~dp0Launch-Silent.vbs"
 "@
 Set-Content -Path "$packageDir\Run-Portable.cmd" -Value $runCmd -Encoding ASCII
 

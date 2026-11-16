@@ -57,6 +57,9 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         [DllImport("user32.dll")]
         public static extern IntPtr GetShellWindow();
 
+        [DllImport("user32.dll")]
+        public static extern int GetSystemMetrics(int nIndex);
+
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool GetSystemTimes(out long lpIdle, out long lpKernel, out long lpUser);
 
@@ -137,6 +140,8 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         private static bool _hasPdh = false;
         private static int _gpuMode = 0; // 0 = Dedicated/NVIDIA (Task Manager GPU 1), 1 = Integrated/Intel (Task Manager GPU 0), 2 = Peak Load
         private static int _styleMode = 0; // 0 = Native Taskbar (Flush on Glass - Default), 1 = Fluent Capsule, 2 = Floating Card
+        private static bool _isSys_MonRunning = false;
+        private static Mutex _singleInstanceMutex = null;
 
         private static double? QueryCpuTemp() {
             try {
@@ -166,9 +171,9 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 if (fg == progman) return false;
                 RECT r;
                 if (GetWindowRect(fg, out r)) {
-                    int w = (int)SystemParameters.PrimaryScreenWidth;
-                    int h = (int)SystemParameters.PrimaryScreenHeight;
-                    if (r.Left <= 0 && r.Top <= 0 && r.Right >= w && r.Bottom >= h) {
+                    int screenW = GetSystemMetrics(0); // SM_CXSCREEN in physical pixels
+                    int screenH = GetSystemMetrics(1); // SM_CYSCREEN in physical pixels
+                    if (screenW > 0 && screenH > 0 && r.Left <= 0 && r.Top <= 0 && r.Right >= screenW && r.Bottom >= screenH) {
                         return true;
                     }
                 }
@@ -177,6 +182,12 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         }
 
         public static void Launch(int posX, string capPath) {
+            bool isNew;
+            _singleInstanceMutex = new Mutex(true, @"Local\Win11TaskbarMonitor_SingleInstance_Mutex", out isNew);
+            if (!isNew) {
+                return;
+            }
+
             IntPtr hDesk = OpenDesktop("Default", 0, false, 0x01FF);
             GetSystemTimes(out _pIdle, out _pKernel, out _pUser);
 
@@ -218,13 +229,19 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                 IntPtr tray = FindWindow("Shell_TrayWnd", null);
                 RECT rTray = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
-                if (tray != IntPtr.Zero) { GetWindowRect(tray, out rTray); }
+                if (tray != IntPtr.Zero) {
+                    GetWindowRect(tray, out rTray);
+                    try {
+                        new WindowInteropHelper(win).Owner = tray;
+                    } catch {}
+                }
 
                 int trayH = rTray.Bottom - rTray.Top;
                 int widgetH = 36;
                 int initialMargin = Math.Max(2, (trayH - widgetH) / 2);
 
-                int defaultX = posX > 0 ? posX : (rTray.Left + 12);
+                try { _isSys_MonRunning = System.Diagnostics.Process.GetProcessesByName("Sys_MonSystemMonitor").Length > 0; } catch {}
+                int defaultX = posX > 0 ? posX : (_isSys_MonRunning ? (rTray.Left + 136) : (rTray.Left + 12));
                 int defaultY = rTray.Top + initialMargin;
                 win.Left = defaultX;
                 win.Top = defaultY;
@@ -593,7 +610,8 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                         int smartMargin = Math.Max(2, (int)Math.Round((curTrayH - contentH) / 2.0));
 
                         if (isLocked) {
-                            int targetX = rCurTray.Left + 12;
+                            try { _isSys_MonRunning = System.Diagnostics.Process.GetProcessesByName("Sys_MonSystemMonitor").Length > 0; } catch {}
+                            int targetX = _isSys_MonRunning ? (rCurTray.Left + 136) : (rCurTray.Left + 12);
                             int targetY = rCurTray.Top + smartMargin;
                             if (Math.Abs(win.Left - targetX) > 0.5 || Math.Abs(win.Top - targetY) > 0.5) {
                                 win.Left = targetX;
@@ -618,6 +636,9 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                                 if (win.Visibility != Visibility.Collapsed) win.Visibility = Visibility.Collapsed;
                             } else {
                                 if (win.Visibility != Visibility.Visible) win.Visibility = Visibility.Visible;
+                                if (curTray != IntPtr.Zero) {
+                                    SetWindowLongPtr(mainHwnd, -8, curTray); // Keep taskbar as explicit Win32 owner
+                                }
                                 SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
                             }
                         }
@@ -629,6 +650,11 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                     int style = GetWindowLong(mainHwnd, -20);
                     SetWindowLong(mainHwnd, -20, style | 0x08000080);
 
+                    // Set Shell_TrayWnd as explicit Win32 Owner (GWLP_HWNDPARENT = -8) so DWM renders widget above taskbar
+                    if (tray != IntPtr.Zero) {
+                        SetWindowLongPtr(mainHwnd, -8, tray);
+                    }
+
                     // Ensure window stays directly on top of the taskbar glass in the Topmost band
                     SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
 
@@ -637,7 +663,8 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                     double h = border.ActualHeight > 0 ? border.ActualHeight : 34.0;
                     int sm = Math.Max(2, (int)Math.Round(((rTray.Bottom - rTray.Top) - h) / 2.0));
                     if (posX <= 0) {
-                        win.Left = rTray.Left + 12;
+                        try { _isSys_MonRunning = System.Diagnostics.Process.GetProcessesByName("Sys_MonSystemMonitor").Length > 0; } catch {}
+                        win.Left = _isSys_MonRunning ? (rTray.Left + 136) : (rTray.Left + 12);
                         win.Top = rTray.Top + sm;
                     }
 

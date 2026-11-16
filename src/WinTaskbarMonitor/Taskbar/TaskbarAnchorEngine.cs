@@ -80,6 +80,9 @@ public sealed class TaskbarAnchorEngine : IDisposable
         return new IntPtr(SetWindowLong(hWnd, nIndex, dwNewLong.ToInt32()));
     }
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
     private static extern uint RegisterWindowMessage(string lpString);
     #endregion
@@ -113,8 +116,11 @@ public sealed class TaskbarAnchorEngine : IDisposable
         IntPtr shellTray = FindWindow("Shell_TrayWnd", null);
         if (shellTray != IntPtr.Zero)
         {
-            SetWindowLongPtr(hWnd, -8 /* GWL_HWNDPARENT */, shellTray);
+            SetWindowLongPtr(hWnd, -8 /* GWLP_HWNDPARENT */, shellTray);
         }
+
+        // Keep window anchored directly on the taskbar glass in the Topmost band
+        SetWindowPos(hWnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
 
         _hwndSource = HwndSource.FromHwnd(hWnd);
         _hwndSource?.AddHook(WndProc);
@@ -197,8 +203,10 @@ public sealed class TaskbarAnchorEngine : IDisposable
             // Calculate X anchor with smart equal margin
             if (settings.Alignment == TaskbarAlignment.LeftEdge)
             {
-                // Fixed on left side of taskbar with exact equal margin
-                targetScreenX = (taskbarRect.Left / dpiX) + vMargin;
+                // Fixed on left side of taskbar with exact equal margin (offset cleanly if Sys_Mon is running)
+                bool sys_monRunning = false;
+                try { sys_monRunning = Process.GetProcessesByName("Sys_MonSystemMonitor").Length > 0; } catch {}
+                targetScreenX = sys_monRunning ? 136.0 : ((taskbarRect.Left / dpiX) + vMargin);
             }
             else if (settings.Alignment == TaskbarAlignment.RightEdge || !hasTrayRect)
             {

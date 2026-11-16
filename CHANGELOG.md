@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.1.8] - 2026-11-16
+
+### Fixed
+- **Silent Background Execution & Auto-Start Without CMD Window**:
+  - **Eliminated Startup & Launch Console Popups**: Authored `Launch-Silent.vbs` running under `wscript.exe` (`IMAGE_SUBSYSTEM_WINDOWS_GUI`) calling `WshShell.Run(..., 0, False)` (`SW_HIDE`). Spawns the PowerShell background daemon completely headless without creating any conhost or Windows Terminal console window on screen.
+  - **Persistent Detached Daemon**: Daemon runs completely detached in the user's interactive session, independent of any open cmd, terminal, or console windows. Closing any terminal or console window no longer affects or terminates the monitoring daemon.
+  - **Updated Registry & Shortcuts**: Configured `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Win11TaskbarMonitor` and desktop/start menu shortcuts to invoke `wscript.exe "$installDir\Launch-Silent.vbs"`.
+  - **Taskbar Z-Order Ownership**: Set explicit Win32 window ownership to `Shell_TrayWnd` via `new WindowInteropHelper(win).Owner = tray;` and `SetWindowLongPtr(mainHwnd, -8, tray)` in `win.Loaded` and `timer.Tick`. Windows DWM guarantees the widget is permanently rendered in front of the taskbar (Target Z=13 vs Tray Z=17) and never falls behind the taskbar.
+  - **Single-Instance Protection**: Added named Mutex `Local\Win11TaskbarMonitor_SingleInstance_Mutex` to guarantee only one monitor instance runs at any time, preventing duplicate processes.
+  - **Sys_Mon Coexistence**: Dynamically detects if `Sys_MonSystemMonitor` is running on the taskbar and offsets the widget to `x = 136` right beside Sys_Mon on the taskbar glass without collision; when Sys_Mon is closed, docks at `x = 12`.
+  - **Distribution Refresh**: Recompiled Release executable and refreshed standalone setup archive at `dist/Win11TaskbarMonitor-Setup.zip` (1.65 MB).
+
+---
+
 ## [1.1.7] - 2026-11-15
 
 ### Fixed

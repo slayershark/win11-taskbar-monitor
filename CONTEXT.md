@@ -27,6 +27,13 @@
 
 ## 3. Completed Features
 
+- [x] **Silent Background Execution & Auto-Start Without CMD Window**:
+  - Eliminated console window popups at logon and runtime by authoring `Launch-Silent.vbs` running under `wscript.exe` (`IMAGE_SUBSYSTEM_WINDOWS_GUI`) with `WshShell.Run(..., 0, False)` (`SW_HIDE`). Spawns the background host process completely windowless without any conhost or Windows Terminal window creation.
+  - Updated `scripts/install.ps1` to configure `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Win11TaskbarMonitor` and desktop/start menu shortcuts to invoke `wscript.exe "$installDir\Launch-Silent.vbs"`.
+  - Set explicit Win32 window ownership to `Shell_TrayWnd` via `new WindowInteropHelper(win).Owner = tray;` and `SetWindowLongPtr(mainHwnd, -8, tray)` in `win.Loaded` and `timer.Tick`, guaranteeing Windows DWM renders the widget above the taskbar (Z=13 vs Tray Z=17) and preventing it from falling behind the taskbar.
+  - Implemented single-instance Mutex `Local\Win11TaskbarMonitor_SingleInstance_Mutex` to prevent duplicate daemon processes.
+  - Handled multi-monitor coexistence with `Sys_MonSystemMonitor`: automatically detects if Sys_Mon is running and docks at `x = 136` directly beside it without collision, or docks at `x = 12` if Sys_Mon is not present.
+  - Ensured process resilience: daemon runs detached in user Session 2, completely independent of any open cmd, terminal, or console windows.
 - [x] **Taskbar Visibility & DirectComposition Layering with Fullscreen Auto-Hide**:
   - Diagnosed and resolved widget occlusion where setting `Topmost = false` caused Windows 11 `Shell_TrayWnd`'s DirectComposition/XAML Islands surfaces to draw over the widget, hiding it completely.
   - Restored `win.Topmost = true` and `SetWindowPos(HWND_TOPMOST)` so the telemetry metrics sit clearly on top of the taskbar glass without being covered.

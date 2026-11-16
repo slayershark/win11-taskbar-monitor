@@ -49,6 +49,7 @@ if (Test-Path "$PSScriptRoot\Win11TaskbarMonitor.exe") {
 
 $sourceDaemon = if (Test-Path "$PSScriptRoot\LiveDaemon.cs") { "$PSScriptRoot\LiveDaemon.cs" } else { "$PSScriptRoot\..\scripts\LiveDaemon.cs" }
 $sourceRunner = if (Test-Path "$PSScriptRoot\Run-WinTaskbarMonitor.ps1") { "$PSScriptRoot\Run-WinTaskbarMonitor.ps1" } else { "$PSScriptRoot\..\scripts\Run-WinTaskbarMonitor.ps1" }
+$sourceVbs = if (Test-Path "$PSScriptRoot\Launch-Silent.vbs") { "$PSScriptRoot\Launch-Silent.vbs" } else { "$PSScriptRoot\..\scripts\Launch-Silent.vbs" }
 $sourceUninstall = if (Test-Path "$PSScriptRoot\uninstall.ps1") { "$PSScriptRoot\uninstall.ps1" } else { "$PSScriptRoot\..\scripts\uninstall.ps1" }
 $sourceIco = if (Test-Path "$PSScriptRoot\app.ico") { "$PSScriptRoot\app.ico" } elseif (Test-Path "$PSScriptRoot\..\assets\app.ico") { "$PSScriptRoot\..\assets\app.ico" } else { $null }
 
@@ -96,22 +97,25 @@ if (Test-Path $sourceRunner) {
 if (Test-Path $sourceDaemon) {
     Copy-Item -Path $sourceDaemon -Destination "$installDir\LiveDaemon.cs" -Force
 }
+if (Test-Path $sourceVbs) {
+    Copy-Item -Path $sourceVbs -Destination "$installDir\Launch-Silent.vbs" -Force
+}
 $targetIco = "$installDir\app.ico"
 if ($sourceIco -and (Test-Path $sourceIco)) {
     Copy-Item -Path $sourceIco -Destination $targetIco -Force
 }
-Write-Host "[+] Copied application files, icons, and runner" -ForegroundColor Green
+Write-Host "[+] Copied application files, icons, and silent runner" -ForegroundColor Green
 
 # Remove legacy WinTaskbarMonitor shortcuts if present
 Remove-Item "$startMenuDir\WinTaskbarMonitor.lnk" -ErrorAction SilentlyContinue
 Remove-Item "$desktopPath\WinTaskbarMonitor.lnk" -ErrorAction SilentlyContinue
 
-# 4. Create Start Menu Shortcut (Using silent runner to prevent SAC policy blocks)
+# 4. Create Start Menu Shortcut (Using silent runner to prevent SAC policy blocks and eliminate cmd window)
 $shortcutPath = "$startMenuDir\Win11TaskbarMonitor.lnk"
 $wshShell = New-Object -ComObject WScript.Shell
 $shortcut = $wshShell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath = "powershell.exe"
-$shortcut.Arguments = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
+$shortcut.TargetPath = "wscript.exe"
+$shortcut.Arguments = "`"$installDir\Launch-Silent.vbs`""
 $shortcut.WorkingDirectory = $installDir
 $shortcut.Description = "Lightweight Windows 11 Taskbar System Monitor"
 $shortcut.IconLocation = if (Test-Path $targetIco) { "$targetIco,0" } else { "$targetExe,0" }
@@ -122,8 +126,8 @@ Write-Host "[+] Created Start Menu shortcut in $startMenuDir" -ForegroundColor G
 if ($CreateDesktopShortcut) {
     $desktopShortcut = "$desktopPath\Win11TaskbarMonitor.lnk"
     $scDesktop = $wshShell.CreateShortcut($desktopShortcut)
-    $scDesktop.TargetPath = "powershell.exe"
-    $scDesktop.Arguments = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
+    $scDesktop.TargetPath = "wscript.exe"
+    $scDesktop.Arguments = "`"$installDir\Launch-Silent.vbs`""
     $scDesktop.WorkingDirectory = $installDir
     $scDesktop.Description = "Lightweight Windows 11 Taskbar System Monitor"
     $scDesktop.IconLocation = if (Test-Path $targetIco) { "$targetIco,0" } else { "$targetExe,0" }
@@ -139,7 +143,7 @@ if (!(Test-Path $uninstallKey)) {
 $exeSizeKb = [Math]::Round((Get-Item $targetExe).Length / 1KB)
 
 Set-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "Win11TaskbarMonitor"
-Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.1.6"
+Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.1.7"
 Set-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "slayershark"
 Set-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $installDir
 $displayIcon = if (Test-Path $targetIco) { "$targetIco,0" } else { "$targetExe,0" }
@@ -150,12 +154,13 @@ Set-ItemProperty -Path $uninstallKey -Name "NoModify" -Value 1 -Type DWord
 Set-ItemProperty -Path $uninstallKey -Name "NoRepair" -Value 1 -Type DWord
 Write-Host "[+] Registered in Windows Installed Apps" -ForegroundColor Green
 
-# 7. Optional Start with Windows
+# 7. Optional Start with Windows (100% Silent execution with zero console/cmd window)
 if ($StartWithWindows) {
     $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-    $runVal = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
+    $runVal = "wscript.exe `"$installDir\Launch-Silent.vbs`""
     Set-ItemProperty -Path $runKey -Name "Win11TaskbarMonitor" -Value $runVal
-    Write-Host "[+] Enabled Start with Windows" -ForegroundColor Green
+    Remove-ItemProperty -Path $runKey -Name "WinTaskbarMonitor" -ErrorAction SilentlyContinue
+    Write-Host "[+] Enabled Start with Windows (100% Silent Background Execution, No CMD Window)" -ForegroundColor Green
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Cyan
@@ -165,6 +170,6 @@ Write-Host "Win11TaskbarMonitor is now installed." -ForegroundColor White
 Write-Host "Zero-policy runner enables seamless execution without Developer Mode." -ForegroundColor White
 
 if ($LaunchAfterInstall) {
-    Write-Host "`n[*] Launching Win11TaskbarMonitor..." -ForegroundColor Yellow
-    Start-Process powershell.exe -ArgumentList "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installDir\Run-WinTaskbarMonitor.ps1`""
+    Write-Host "`n[*] Launching Win11TaskbarMonitor silently..." -ForegroundColor Yellow
+    Start-Process wscript.exe -ArgumentList "`"$installDir\Launch-Silent.vbs`""
 }
