@@ -11,6 +11,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using System.Windows.Controls.Primitives;
 using System.Management;
 
 namespace Win11TaskbarMonitor.LiveDaemon {
@@ -483,11 +484,66 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 };
                 applyStyle();
 
+                Popup popup = new Popup();
+                popup.Placement = PlacementMode.Top;
+                popup.PlacementTarget = border;
+                popup.VerticalOffset = -6;
+                popup.AllowsTransparency = true;
+                popup.PopupAnimation = PopupAnimation.Fade;
+
+                TextBlock ttText = new TextBlock {
+                    Text = "CPU: Loading...\nGPU: Loading...\nRAM: Loading...",
+                    FontSize = 11.5,
+                    FontFamily = new System.Windows.Media.FontFamily("Segoe UI Variable Text, Segoe UI, sans-serif"),
+                    Foreground = System.Windows.Media.Brushes.White,
+                    LineHeight = 18.0,
+                    LineStackingStrategy = LineStackingStrategy.BlockLineHeight
+                };
+
+                Border popupBorder = new Border {
+                    Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(245, 28, 28, 28)),
+                    BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(60, 255, 255, 255)),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(10, 7, 10, 7),
+                    SnapsToDevicePixels = true
+                };
+                popupBorder.Child = ttText;
+                popup.Child = popupBorder;
+
+                popup.Opened += (ts, te) => {
+                    win.Dispatcher.BeginInvoke(new Action(() => {
+                        try {
+                            var source = PresentationSource.FromVisual(popupBorder) as HwndSource;
+                            if (source != null && source.Handle != IntPtr.Zero) {
+                                SetWindowPos(source.Handle, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
+                            }
+                        } catch {}
+                    }), DispatcherPriority.Render);
+                };
+
                 border.MouseEnter += (s, e) => {
                     border.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 255, 255, 255));
+                    popup.IsOpen = true;
                 };
+
                 border.MouseLeave += (s, e) => {
                     applyStyle();
+                    DispatcherTimer hideTimer = new DispatcherTimer();
+                    hideTimer.Interval = TimeSpan.FromMilliseconds(120);
+                    hideTimer.Tick += (hs, he) => {
+                        hideTimer.Stop();
+                        if (!border.IsMouseOver && !popupBorder.IsMouseOver) {
+                            popup.IsOpen = false;
+                        }
+                    };
+                    hideTimer.Start();
+                };
+
+                popupBorder.MouseLeave += (s, e) => {
+                    if (!border.IsMouseOver) {
+                        popup.IsOpen = false;
+                    }
                 };
 
                 StackPanel stack = new StackPanel();
@@ -652,10 +708,6 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 menu.Items.Add(itemExit);
                 win.ContextMenu = menu;
 
-                ToolTip tt = new ToolTip();
-                tt.Content = "CPU: Loading...\nGPU: Loading...\nRAM: Loading...";
-                win.ToolTip = tt;
-
                 IntPtr mainHwnd = IntPtr.Zero;
 
                 // Lightweight 1-second UI Timer (consumes < 0.05ms per tick)
@@ -684,7 +736,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                             txtCpuT.Foreground = ct >= 85 ? _brushRed : ct >= 75 ? _brushAmber : _brushWhite;
                         }
 
-                        // Clean hover tooltip
+                        // Clean hover tooltip (updates Text in-place so ToolTip popup stays open and topmost)
                         string cpuLine = (_hasCpuTemp && _cachedCpuTempValid)
                             ? string.Format("CPU: {0} ({1})", txtCpu.Text, txtCpuT.Text)
                             : string.Format("CPU: {0}", txtCpu.Text);
@@ -692,7 +744,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                             ? string.Format("GPU: {0} ({1})", txtGpu.Text, txtGpuT.Text)
                             : string.Format("GPU: {0}", txtGpu.Text);
                         string ramLine = string.Format("RAM: {0:F1} / {1:F1} GB ({2})", _cachedUsedGb, _cachedTotGb, txtRam.Text);
-                        tt.Content = string.Format("{0}\n{1}\n{2}", cpuLine, gpuLine, ramLine);
+                        ttText.Text = string.Format("{0}\n{1}\n{2}", cpuLine, gpuLine, ramLine);
 
                         // Position checking without heavy process enumeration
                         IntPtr curTray = FindWindow("Shell_TrayWnd", null);
@@ -775,18 +827,39 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                         capTimer.Tick += (cs, ce) => {
                             capTimer.Stop();
                             try {
-                                Bitmap bmp = new Bitmap(1920, 48);
-                                using (Graphics g = Graphics.FromImage(bmp)) {
+                                if (capPath.IndexOf("tooltip", StringComparison.OrdinalIgnoreCase) >= 0) {
+                                    popup.IsOpen = true;
+                                    DispatcherTimer snapTimer = new DispatcherTimer();
+                                    snapTimer.Interval = TimeSpan.FromMilliseconds(400);
+                                    snapTimer.Tick += (ss, se) => {
+                                        snapTimer.Stop();
+                                        try {
+                                            Bitmap bmp = new Bitmap(1920, 150);
+                                            using (Graphics g = Graphics.FromImage(bmp)) {
+                                                g.CopyFromScreen(0, 930, 0, 0, new System.Drawing.Size(1920, 150));
+                                            }
+                                            bmp.Save(capPath, ImageFormat.Png);
+                                            bmp.Dispose();
+                                        } catch {}
+                                        popup.IsOpen = false;
+                                    };
+                                    snapTimer.Start();
+                                    return;
+                                }
+
+                                Bitmap bmp2 = new Bitmap(1920, 48);
+                                using (Graphics g = Graphics.FromImage(bmp2)) {
                                     g.CopyFromScreen(0, 1032, 0, 0, new System.Drawing.Size(1920, 48));
                                 }
-                                bmp.Save(capPath, ImageFormat.Png);
-                                bmp.Dispose();
+                                bmp2.Save(capPath, ImageFormat.Png);
+                                bmp2.Dispose();
                             } catch {}
                         };
                         capTimer.Start();
                     }
                 };
 
+                win.Closed += (ws, we) => { popup.IsOpen = false; };
                 win.Show();
                 System.Windows.Threading.Dispatcher.Run();
             }));

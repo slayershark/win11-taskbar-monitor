@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.1.10] - 2026-11-16
+
+### Fixed
+- **Top-Popping Hover Tooltip & Permanent Z-Order Fix**:
+  - **In-Place Text Updates**: Replaced `ContentControl.Content` string re-assignment with in-place `ttText.Text` updates inside the 1-second UI timer. Setting `Content` previously caused WPF to destroy and recreate the tooltip visual tree every second, which dropped the tooltip out of the topmost Z-order and caused it to slip behind the widget. Updating `ttText.Text` directly preserves the visual tree and keeps the popup open smoothly.
+  - **Positioned Directly Above the Taskbar Widget**: Replaced standard WPF `ToolTip` with an explicit `Popup` configured with `Placement = PlacementMode.Top`, `PlacementTarget = border`, and `VerticalOffset = -6`. Tooltip now floats cleanly in the desktop area at Y=965 directly above the taskbar widget without overlapping the widget or clipping against taskbar bezels.
+  - **Forced HWND_TOPMOST**: Enforced `SetWindowPos(HWND_TOPMOST)` on `popup.Opened` to guarantee the tooltip popup is always rendered at the absolute top of the desktop Z-order.
+  - **Fluent Dark Card Design**: Applied Windows 11 Fluent dark styling (`#F51C1C1C` acrylic dark background, 1px subtle white border, `CornerRadius = 6`, Segoe UI Variable font, 18px line height, tabular numbers).
+  - **Mouse Enter/Leave Hysteresis**: Added smooth 120ms hysteresis on mouse leave so the tooltip remains open continuously while the user hovers over the widget, and dismisses smoothly when leaving.
+  - **WPF XAML Tooltip Alignment**: Updated `src/WinTaskbarMonitor/MainWindow.xaml` with `ToolTipService.Placement="Top"`, `VerticalOffset="-6"`, and Fluent `ToolTip` control templates.
+  - **Updated Standalone Package**: Rebuilt Release executable and updated standalone package `dist/Win11TaskbarMonitor-Setup.zip` (1.65 MB).
+
+---
+
 ## [1.1.9] - 2026-11-16
 
 ### Fixed
