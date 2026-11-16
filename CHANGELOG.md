@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.1.9] - 2026-11-16
+
+### Fixed
+- **Launch Flickering & Background Polling Decoupling (Rock-Solid Stability)**:
+  - **Decoupled Hardware Polling**: Moved all hardware sampling (PDH CPU, NVML GPU, MemoryStatusEx, PDH GPU) to a background threadpool `Timer`. The WPF UI thread now only reads atomic cached values, reducing UI thread tick time from ~50ms to < 0.05ms and eliminating UI thread stalls.
+  - **DWM Hierarchy Stability**: Removed per-second `SetWindowLongPtr(mainHwnd, -8, curTray)` and `SetWindowPos(SWP_SHOWWINDOW)` calls. Ownership is now bound once at initialization and only updated if the taskbar handle changes (Explorer restart), eliminating DWM composition resets and flickering.
+  - **Startup Stabilization & Pre-Warming**: Added stabilization loop waiting for `Shell_TrayWnd` to initialize bounds before showing the window, and pre-warmed initial telemetry data so the first frame renders directly in its final position with live numbers (no 0% placeholders or initial position jumps).
+  - **Precision Sys_Mon Docking**: Switched Sys_Mon detection from heavy `Process.GetProcessesByName` to native `FindWindow("Sys_MonOverlayWndClass_Main", null)`. Dynamically docks at `rK.Right + 8` (`x = 150`), ensuring an exact 8px visual gap without border collision.
+  - **Debounced Fullscreen Detection**: Hardened `IsFullscreenApp` to ignore `WorkerW`, `Progman`, and shell windows, and added a 2-second debounce filter so desktop clicks and rapid focus transitions no longer trigger visibility flutter.
+  - **Thread-Safe Frozen Brushes**: Replaced static brushes with frozen brushes (`brush.Freeze()`), completely resolving WPF `Freezable.EnsureConsistentDispatchers` exceptions.
+  - **Tabular Numerals**: Enforced `Typography.SetNumeralAlignment = Tabular` across all metric readouts to eliminate horizontal character jitter.
+  - **Refreshed Standalone Setup**: Rebuilt `dist/Win11TaskbarMonitor-Setup.zip` (1.65 MB).
+
+---
+
 ## [1.1.8] - 2026-11-16
 
 ### Fixed

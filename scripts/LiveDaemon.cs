@@ -4,8 +4,10 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Threading;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -30,6 +32,12 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
 
         [DllImport("user32.dll")]
         public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
@@ -138,10 +146,43 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         private static IntPtr _hCpuCounter = IntPtr.Zero;
         private static IntPtr _hGpuCounter = IntPtr.Zero;
         private static bool _hasPdh = false;
-        private static int _gpuMode = 0; // 0 = Dedicated/NVIDIA (Task Manager GPU 1), 1 = Integrated/Intel (Task Manager GPU 0), 2 = Peak Load
-        private static int _styleMode = 0; // 0 = Native Taskbar (Flush on Glass - Default), 1 = Fluent Capsule, 2 = Floating Card
-        private static bool _isSys_MonRunning = false;
+        private static int _gpuMode = 0; // 0 = Dedicated/NVIDIA, 1 = Integrated/Intel, 2 = Peak Load
+        private static int _styleMode = 0; // 0 = Native Taskbar, 1 = Fluent Capsule, 2 = Floating Card
         private static Mutex _singleInstanceMutex = null;
+
+        // Rock-solid state caching (prevents layout shifts & UI stalls)
+        private static IntPtr _lastTrayHwnd = IntPtr.Zero;
+        private static int _lastTrayH = -1;
+        private static int _cachedSmartMargin = 7;
+        private static int _consecutiveFullscreenTicks = 0;
+        private static bool _hasCpuTemp = false;
+
+        private static SolidColorBrush CreateFrozenBrush(byte r, byte g, byte b, byte a = 255) {
+            SolidColorBrush brush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(a, r, g, b));
+            brush.Freeze();
+            return brush;
+        }
+
+        // Pre-allocated static frozen brushes (thread-safe, zero GC allocation in hot paths)
+        private static readonly SolidColorBrush _brushRed = CreateFrozenBrush(239, 68, 68);
+        private static readonly SolidColorBrush _brushAmber = CreateFrozenBrush(245, 158, 11);
+        private static readonly SolidColorBrush _brushWhite = System.Windows.Media.Brushes.White;
+        private static readonly SolidColorBrush _brushGray = CreateFrozenBrush(156, 163, 175);
+        private static readonly SolidColorBrush _sepBrush = CreateFrozenBrush(255, 255, 255, 40);
+
+        // Atomic telemetry cache populated by background worker thread
+        private static volatile int _cachedCpu = 0;
+        private static volatile int _cachedGpu = 0;
+        private static volatile string _cachedGpuTempStr = "N/A";
+        private static volatile bool _cachedGpuTempIsElevated = false;
+        private static volatile bool _cachedGpuTempIsCritical = false;
+        private static volatile int _cachedRam = 0;
+        private static double _cachedUsedGb = 0.0;
+        private static double _cachedTotGb = 0.0;
+        private static double _cachedCpuTemp = 0.0;
+        private static volatile bool _cachedCpuTempValid = false;
+
+        private static Timer _bgTimer = null;
 
         private static double? QueryCpuTemp() {
             try {
@@ -163,16 +204,145 @@ namespace Win11TaskbarMonitor.LiveDaemon {
             return null;
         }
 
+        private static void PollHardware(object state) {
+            try {
+                if (_hasPdh) {
+                    try { PdhCollectQueryData(_hPdhQuery); } catch {}
+                }
+
+                // 1. CPU
+                double pct = -1.0;
+                if (_hasPdh && _hCpuCounter != IntPtr.Zero) {
+                    try {
+                        PDH_FMT_COUNTERVALUE cpuVal;
+                        if (PdhGetFormattedCounterValue(_hCpuCounter, PDH_FMT_DOUBLE, IntPtr.Zero, out cpuVal) == 0 && cpuVal.CStatus == 0) {
+                            pct = Math.Max(0.0, Math.Min(100.0, cpuVal.doubleValue));
+                        }
+                    } catch {}
+                }
+                if (pct < 0.0) {
+                    long i, k, u;
+                    if (GetSystemTimes(out i, out k, out u)) {
+                        long tot = (k - _pKernel) + (u - _pUser);
+                        long idl = i - _pIdle;
+                        _pIdle = i; _pKernel = k; _pUser = u;
+                        pct = tot > 0 ? (double)(tot - idl) / tot * 100.0 : 0.0;
+                        pct = Math.Max(0.0, Math.Min(100.0, pct));
+                    } else {
+                        pct = 0.0;
+                    }
+                }
+                _cachedCpu = (int)Math.Round(pct, MidpointRounding.AwayFromZero);
+
+                // 2. RAM
+                MEMORYSTATUSEX mem = new MEMORYSTATUSEX();
+                if (GlobalMemoryStatusEx(mem)) {
+                    _cachedTotGb = mem.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
+                    _cachedUsedGb = (mem.ullTotalPhys - mem.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
+                    double rPct = _cachedTotGb > 0 ? (_cachedUsedGb / _cachedTotGb) * 100.0 : 0;
+                    _cachedRam = (int)Math.Round(rPct, MidpointRounding.AwayFromZero);
+                }
+
+                // 3. GPU (Isolated discrete NVIDIA or integrated Intel)
+                double gpuPct = 0.0;
+                double nvmlGpu = 0.0;
+                if (_hasNvml) {
+                    try {
+                        NvmlUtil ut;
+                        if (nvmlDeviceGetUtilizationRates(_nvmlDev, out ut) == 0) {
+                            nvmlGpu = (double)ut.gpu;
+                        }
+                        uint temp;
+                        if (nvmlDeviceGetTemperature(_nvmlDev, 0, out temp) == 0 && temp > 0 && temp < 125) {
+                            _cachedGpuTempStr = temp + "\u00B0C";
+                            _cachedGpuTempIsCritical = temp >= 85;
+                            _cachedGpuTempIsElevated = temp >= 75 && temp < 85;
+                        }
+                    } catch {}
+                }
+
+                double pdhMaxEngine = 0.0;
+                double intel3d = 0.0;
+                if (_hasPdh && _hGpuCounter != IntPtr.Zero && (_gpuMode != 0 || !_hasNvml)) {
+                    try {
+                        uint bufSize = 0, count = 0;
+                        PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, IntPtr.Zero);
+                        if (bufSize > 0) {
+                            IntPtr pBuf = Marshal.AllocHGlobal((int)bufSize);
+                            try {
+                                if (PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, pBuf) == 0) {
+                                    for (int idx = 0; idx < count; idx++) {
+                                        long baseOff = pBuf.ToInt64() + idx * 24;
+                                        uint status = (uint)Marshal.ReadInt32(new IntPtr(baseOff + 8));
+                                        if (status == 0) {
+                                            double val = BitConverter.ToDouble(BitConverter.GetBytes(Marshal.ReadInt64(new IntPtr(baseOff + 16))), 0);
+                                            if (!double.IsNaN(val) && !double.IsInfinity(val) && val > 0.01) {
+                                                IntPtr szName = Marshal.ReadIntPtr(new IntPtr(baseOff), 0);
+                                                string name = Marshal.PtrToStringUni(szName);
+                                                if (name != null) {
+                                                    if (val > pdhMaxEngine) pdhMaxEngine = val;
+                                                    if (name.Contains("engtype_3D") && val > intel3d) intel3d = val;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } finally {
+                                Marshal.FreeHGlobal(pBuf);
+                            }
+                        }
+                    } catch {}
+                }
+
+                if (_gpuMode == 0) {
+                    gpuPct = _hasNvml ? nvmlGpu : pdhMaxEngine;
+                } else if (_gpuMode == 1) {
+                    gpuPct = intel3d > 0 ? intel3d : pdhMaxEngine;
+                    _cachedGpuTempStr = "N/A";
+                    _cachedGpuTempIsCritical = false;
+                    _cachedGpuTempIsElevated = false;
+                } else {
+                    gpuPct = Math.Max(nvmlGpu, pdhMaxEngine);
+                }
+                gpuPct = Math.Max(0.0, Math.Min(100.0, gpuPct));
+                _cachedGpu = (int)Math.Round(gpuPct, MidpointRounding.AwayFromZero);
+
+                // 4. CPU Temperature (if available)
+                if (_hasCpuTemp) {
+                    double? ct = QueryCpuTemp();
+                    if (ct.HasValue && ct.Value > 15 && ct.Value < 115) {
+                        _cachedCpuTemp = ct.Value;
+                        _cachedCpuTempValid = true;
+                    } else {
+                        _cachedCpuTempValid = false;
+                    }
+                }
+            } catch {}
+        }
+
         private static bool IsFullscreenApp(IntPtr taskbarHwnd) {
             try {
                 IntPtr fg = GetForegroundWindow();
                 if (fg == IntPtr.Zero || fg == taskbarHwnd || fg == GetShellWindow()) return false;
-                IntPtr progman = FindWindow("Progman", null);
-                if (fg == progman) return false;
+
+                // Ignore all shell, desktop, and system overlay windows
+                StringBuilder cls = new StringBuilder(64);
+                GetClassName(fg, cls, 64);
+                string className = cls.ToString();
+                if (className == "Progman" || className == "WorkerW" || className.StartsWith("Shell_") || 
+                    className == "Windows.UI.Core.CoreWindow" || className.Contains("Taskbar") || 
+                    className == "XamlExplorerHostIslandWindow") {
+                    return false;
+                }
+
+                int style = GetWindowLong(fg, -16); // GWL_STYLE
+                if ((style & 0x10000000) == 0) return false; // Must be visible
+                if ((style & 0x40000000) != 0) return false; // Must not be child
+
                 RECT r;
                 if (GetWindowRect(fg, out r)) {
-                    int screenW = GetSystemMetrics(0); // SM_CXSCREEN in physical pixels
-                    int screenH = GetSystemMetrics(1); // SM_CYSCREEN in physical pixels
+                    int screenW = GetSystemMetrics(0);
+                    int screenH = GetSystemMetrics(1);
                     if (screenW > 0 && screenH > 0 && r.Left <= 0 && r.Top <= 0 && r.Right >= screenW && r.Bottom >= screenH) {
                         return true;
                     }
@@ -191,6 +361,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
             IntPtr hDesk = OpenDesktop("Default", 0, false, 0x01FF);
             GetSystemTimes(out _pIdle, out _pKernel, out _pUser);
 
+            // Pre-warm hardware queries
             try {
                 if (nvmlInit_v2() == 0) {
                     uint count = 0;
@@ -201,6 +372,28 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                     }
                 }
             } catch {}
+
+            try {
+                if (PdhOpenQuery(null, IntPtr.Zero, out _hPdhQuery) == 0) {
+                    PdhAddEnglishCounter(_hPdhQuery, @"\Processor Information(_Total)\% Processor Time", IntPtr.Zero, out _hCpuCounter);
+                    PdhAddEnglishCounter(_hPdhQuery, @"\GPU Engine(*)\Utilization Percentage", IntPtr.Zero, out _hGpuCounter);
+                    PdhCollectQueryData(_hPdhQuery);
+                    _hasPdh = true;
+                }
+            } catch {}
+
+            // Probe CPU temp once asynchronously; if unavailable, never poll WMI again
+            try {
+                double? ct = QueryCpuTemp();
+                if (ct.HasValue && ct.Value > 15 && ct.Value < 115) {
+                    _hasCpuTemp = true;
+                    _cachedCpuTemp = ct.Value;
+                    _cachedCpuTempValid = true;
+                }
+            } catch {}
+
+            // Immediate pre-warm tick so initial render has live metrics
+            PollHardware(null);
 
             Thread t = new Thread(new ThreadStart(() => {
                 if (hDesk != IntPtr.Zero) {
@@ -227,22 +420,39 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 win.ResizeMode = ResizeMode.NoResize;
                 win.FontFamily = new System.Windows.Media.FontFamily("Segoe UI Variable Text, Segoe UI, sans-serif");
 
-                IntPtr tray = FindWindow("Shell_TrayWnd", null);
+                // Stabilization: during startup, wait up to 3 seconds for Explorer taskbar to be ready
+                IntPtr tray = IntPtr.Zero;
                 RECT rTray = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
+                for (int waitCount = 0; waitCount < 30; waitCount++) {
+                    tray = FindWindow("Shell_TrayWnd", null);
+                    if (tray != IntPtr.Zero && GetWindowRect(tray, out rTray) && (rTray.Bottom - rTray.Top) > 20) {
+                        break;
+                    }
+                    Thread.Sleep(100);
+                }
+                _lastTrayHwnd = tray;
+
                 if (tray != IntPtr.Zero) {
-                    GetWindowRect(tray, out rTray);
                     try {
                         new WindowInteropHelper(win).Owner = tray;
                     } catch {}
                 }
 
                 int trayH = rTray.Bottom - rTray.Top;
-                int widgetH = 36;
-                int initialMargin = Math.Max(2, (trayH - widgetH) / 2);
+                int widgetH = 34;
+                _cachedSmartMargin = Math.Max(2, (trayH - widgetH) / 2);
 
-                try { _isSys_MonRunning = System.Diagnostics.Process.GetProcessesByName("Sys_MonSystemMonitor").Length > 0; } catch {}
-                int defaultX = posX > 0 ? posX : (_isSys_MonRunning ? (rTray.Left + 136) : (rTray.Left + 12));
-                int defaultY = rTray.Top + initialMargin;
+                // Initial position: inspect if Sys_Mon is visible, place cleanly beside it
+                int initialX = rTray.Left + 12;
+                IntPtr hInitSys_Mon = FindWindow("Sys_MonOverlayWndClass_Main", null);
+                if (hInitSys_Mon != IntPtr.Zero && IsWindowVisible(hInitSys_Mon)) {
+                    RECT rK;
+                    if (GetWindowRect(hInitSys_Mon, out rK) && rK.Right > 0 && rK.Right < 300) {
+                        initialX = rK.Right + 8;
+                    }
+                }
+                int defaultX = posX > 0 ? posX : initialX;
+                int defaultY = rTray.Top + _cachedSmartMargin;
                 win.Left = defaultX;
                 win.Top = defaultY;
 
@@ -255,19 +465,16 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                 Action applyStyle = () => {
                     if (_styleMode == 0) {
-                        // Native Flat: transparent background, zero border, sits directly on taskbar surface
                         border.Background = System.Windows.Media.Brushes.Transparent;
                         border.BorderBrush = System.Windows.Media.Brushes.Transparent;
                         border.BorderThickness = new Thickness(0);
                         border.CornerRadius = new CornerRadius(4);
                     } else if (_styleMode == 1) {
-                        // Fluent Capsule: subtle taskbar pill
                         border.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 255, 255, 255));
                         border.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 255, 255, 255));
                         border.BorderThickness = new Thickness(1);
                         border.CornerRadius = new CornerRadius(4);
                     } else {
-                        // Floating HUD Card: dark frame
                         border.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 24, 24, 24));
                         border.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(70, 255, 255, 255));
                         border.BorderThickness = new Thickness(1);
@@ -287,16 +494,26 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 stack.Orientation = Orientation.Horizontal;
                 stack.VerticalAlignment = VerticalAlignment.Center;
 
-                TextBlock txtCpu = new TextBlock { Text = "0%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 30, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
-                TextBlock txtCpuT = new TextBlock { Text = "0\u00B0C", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 34, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                // Pre-populated with pre-warmed values & Tabular figures
+                TextBlock txtCpu = new TextBlock { Text = _cachedCpu + "%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 32, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                Typography.SetNumeralAlignment(txtCpu, FontNumeralAlignment.Tabular);
+
+                TextBlock txtCpuT = new TextBlock { Text = "0\u00B0C", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 36, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                Typography.SetNumeralAlignment(txtCpuT, FontNumeralAlignment.Tabular);
                 StackPanel pnlCpuT = CreateItem("CPU\u00B0", txtCpuT);
                 System.Windows.Shapes.Rectangle sepCpuT = CreateSep();
-                pnlCpuT.Visibility = Visibility.Collapsed;
-                sepCpuT.Visibility = Visibility.Collapsed;
 
-                TextBlock txtGpu = new TextBlock { Text = "0%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 30, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
-                TextBlock txtGpuT = new TextBlock { Text = "N/A", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 34, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)) };
-                TextBlock txtRam = new TextBlock { Text = "0%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 30, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                pnlCpuT.Visibility = _hasCpuTemp ? Visibility.Visible : Visibility.Collapsed;
+                sepCpuT.Visibility = _hasCpuTemp ? Visibility.Visible : Visibility.Collapsed;
+
+                TextBlock txtGpu = new TextBlock { Text = _cachedGpu + "%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 32, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                Typography.SetNumeralAlignment(txtGpu, FontNumeralAlignment.Tabular);
+
+                TextBlock txtGpuT = new TextBlock { Text = _cachedGpuTempStr, FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 36, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = _brushGray };
+                Typography.SetNumeralAlignment(txtGpuT, FontNumeralAlignment.Tabular);
+
+                TextBlock txtRam = new TextBlock { Text = _cachedRam + "%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 32, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                Typography.SetNumeralAlignment(txtRam, FontNumeralAlignment.Tabular);
 
                 stack.Children.Add(CreateItem("CPU", txtCpu));
                 stack.Children.Add(sepCpuT);
@@ -311,119 +528,100 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 border.Child = stack;
                 win.Content = border;
 
+                // Dragging Support
+                bool isDragging = false;
+                System.Windows.Point dragStart = new System.Windows.Point();
                 bool isLocked = true;
 
-                // Defensive drag move (only when unlocked)
-                win.MouseLeftButtonDown += (s, e) => {
-                    try {
-                        if (!isLocked && e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) {
-                            win.DragMove();
-                        }
-                    } catch {}
+                border.MouseLeftButtonDown += (s, e) => {
+                    if (!isLocked) {
+                        isDragging = true;
+                        dragStart = e.GetPosition(win);
+                        border.CaptureMouse();
+                    }
+                };
+                border.MouseMove += (s, e) => {
+                    if (isDragging) {
+                        System.Windows.Point cur = e.GetPosition(win);
+                        win.Left += cur.X - dragStart.X;
+                        win.Top += cur.Y - dragStart.Y;
+                    }
+                };
+                border.MouseLeftButtonUp += (s, e) => {
+                    if (isDragging) {
+                        isDragging = false;
+                        border.ReleaseMouseCapture();
+                    }
                 };
 
-                // Context Menu for user control
+                // Context Menu
                 ContextMenu menu = new ContextMenu();
-                
-                MenuItem itemLock = new MenuItem { Header = "Lock Position (Fixed)", IsCheckable = true, IsChecked = true };
-                itemLock.Click += (s, e) => {
-                    isLocked = itemLock.IsChecked;
-                };
+                MenuItem itemLock = new MenuItem { Header = "Lock Position", IsCheckable = true, IsChecked = true };
+                itemLock.Click += (s, e) => { isLocked = itemLock.IsChecked; };
 
-                MenuItem posMenu = new MenuItem { Header = "Quick Position" };
-                
-                MenuItem posLeft = new MenuItem { Header = "Left of Taskbar (Smart Equal Margin)" };
+                MenuItem posMenu = new MenuItem { Header = "Taskbar Alignment" };
+                MenuItem posLeft = new MenuItem { Header = "Left Taskbar Anchor", IsChecked = true };
+                MenuItem posSys_Mon = new MenuItem { Header = "Beside Sys_Mon (x=150)", IsChecked = false };
                 posLeft.Click += (s, e) => {
-                    IntPtr tHwnd = FindWindow("Shell_TrayWnd", null);
+                    posLeft.IsChecked = true; posSys_Mon.IsChecked = false;
+                    IntPtr curT = FindWindow("Shell_TrayWnd", null);
                     RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
-                    if (tHwnd != IntPtr.Zero) { GetWindowRect(tHwnd, out rt); }
-                    border.UpdateLayout();
-                    double h = border.ActualHeight > 0 ? border.ActualHeight : 36.0;
-                    int sm = Math.Max(2, (int)Math.Round(((rt.Bottom - rt.Top) - h) / 2.0));
-                    win.Left = rt.Left + sm;
-                    win.Top = rt.Top + sm;
+                    if (curT != IntPtr.Zero) GetWindowRect(curT, out rt);
+                    win.Left = rt.Left + 12;
+                    win.Top = rt.Top + _cachedSmartMargin;
                 };
-
-                MenuItem posTray = new MenuItem { Header = "Right of Taskbar (Next to Tray)" };
-                posTray.Click += (s, e) => {
-                    IntPtr tHwnd = FindWindow("Shell_TrayWnd", null);
+                posSys_Mon.Click += (s, e) => {
+                    posLeft.IsChecked = false; posSys_Mon.IsChecked = true;
+                    IntPtr curT = FindWindow("Shell_TrayWnd", null);
                     RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
-                    if (tHwnd != IntPtr.Zero) { GetWindowRect(tHwnd, out rt); }
-                    border.UpdateLayout();
-                    double h = border.ActualHeight > 0 ? border.ActualHeight : 36.0;
-                    int sm = Math.Max(2, (int)Math.Round(((rt.Bottom - rt.Top) - h) / 2.0));
-                    win.Left = 1220;
-                    win.Top = rt.Top + sm;
+                    if (curT != IntPtr.Zero) GetWindowRect(curT, out rt);
+                    win.Left = rt.Left + 150;
+                    win.Top = rt.Top + _cachedSmartMargin;
                 };
-
-                MenuItem posAbove = new MenuItem { Header = "Above Taskbar (Floating Dock)" };
-                posAbove.Click += (s, e) => {
-                    IntPtr tHwnd = FindWindow("Shell_TrayWnd", null);
-                    RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
-                    if (tHwnd != IntPtr.Zero) { GetWindowRect(tHwnd, out rt); }
-                    win.Left = rt.Left + 6;
-                    win.Top = rt.Top - 42;
-                };
-
-                MenuItem posTopRight = new MenuItem { Header = "Top Right of Screen" };
-                posTopRight.Click += (s, e) => { win.Left = 1650; win.Top = 10; };
-
                 posMenu.Items.Add(posLeft);
-                posMenu.Items.Add(posTray);
-                posMenu.Items.Add(posAbove);
-                posMenu.Items.Add(posTopRight);
-
-                MenuItem itemReset = new MenuItem { Header = "Reset Position to Left (Smart Margin)" };
-                itemReset.Click += (s, e) => {
-                    IntPtr tHwnd = FindWindow("Shell_TrayWnd", null);
-                    RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
-                    if (tHwnd != IntPtr.Zero) { GetWindowRect(tHwnd, out rt); }
-                    border.UpdateLayout();
-                    double h = border.ActualHeight > 0 ? border.ActualHeight : 36.0;
-                    int sm = Math.Max(2, (int)Math.Round(((rt.Bottom - rt.Top) - h) / 2.0));
-                    win.Left = rt.Left + sm;
-                    win.Top = rt.Top + sm;
-                };
-
-                MenuItem itemExit = new MenuItem { Header = "Exit Win11TaskbarMonitor" };
-                itemExit.Click += (s, e) => {
-                    win.Close();
-                    System.Windows.Threading.Dispatcher.ExitAllFrames();
-                    Environment.Exit(0);
-                };
+                posMenu.Items.Add(posSys_Mon);
 
                 MenuItem gpuMenu = new MenuItem { Header = "GPU Telemetry Source" };
-                MenuItem gpuItemNvidia = new MenuItem { Header = "NVIDIA GeForce MX350 (Discrete - 100% Synced)", IsCheckable = true, IsChecked = true };
-                MenuItem gpuItemIntel = new MenuItem { Header = "Intel(R) Iris(R) Xe Graphics (Integrated)", IsCheckable = true, IsChecked = false };
-                MenuItem gpuItemPeak = new MenuItem { Header = "Auto / Peak GPU Engine", IsCheckable = true, IsChecked = false };
+                MenuItem gpuNvidia = new MenuItem { Header = "NVIDIA GeForce MX350 (Discrete - Default)", IsCheckable = true, IsChecked = true };
+                MenuItem gpuIntel = new MenuItem { Header = "Intel(R) Iris(R) Xe Graphics (Integrated - GPU 0)", IsCheckable = true, IsChecked = false };
+                MenuItem gpuPeak = new MenuItem { Header = "Auto / Peak GPU Engine", IsCheckable = true, IsChecked = false };
 
-                gpuItemNvidia.Click += (s, e) => {
+                gpuNvidia.Click += (s, e) => {
                     _gpuMode = 0;
-                    gpuItemNvidia.IsChecked = true;
-                    gpuItemIntel.IsChecked = false;
-                    gpuItemPeak.IsChecked = false;
+                    gpuNvidia.IsChecked = true; gpuIntel.IsChecked = false; gpuPeak.IsChecked = false;
                 };
-                gpuItemIntel.Click += (s, e) => {
+                gpuIntel.Click += (s, e) => {
                     _gpuMode = 1;
-                    gpuItemNvidia.IsChecked = false;
-                    gpuItemIntel.IsChecked = true;
-                    gpuItemPeak.IsChecked = false;
+                    gpuNvidia.IsChecked = false; gpuIntel.IsChecked = true; gpuPeak.IsChecked = false;
                 };
-                gpuItemPeak.Click += (s, e) => {
+                gpuPeak.Click += (s, e) => {
                     _gpuMode = 2;
-                    gpuItemNvidia.IsChecked = false;
-                    gpuItemIntel.IsChecked = false;
-                    gpuItemPeak.IsChecked = true;
+                    gpuNvidia.IsChecked = false; gpuIntel.IsChecked = false; gpuPeak.IsChecked = true;
+                };
+                gpuMenu.Items.Add(gpuNvidia);
+                gpuMenu.Items.Add(gpuIntel);
+                gpuMenu.Items.Add(gpuPeak);
+
+                MenuItem itemReset = new MenuItem { Header = "Recalculate Equal Margins" };
+                itemReset.Click += (s, e) => {
+                    IntPtr curT = FindWindow("Shell_TrayWnd", null);
+                    RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
+                    if (curT != IntPtr.Zero) GetWindowRect(curT, out rt);
+                    int sm = Math.Max(2, (int)Math.Round(((rt.Bottom - rt.Top) - border.ActualHeight) / 2.0));
+                    win.Top = rt.Top + sm;
                 };
 
-                gpuMenu.Items.Add(gpuItemNvidia);
-                gpuMenu.Items.Add(gpuItemIntel);
-                gpuMenu.Items.Add(gpuItemPeak);
+                MenuItem itemExit = new MenuItem { Header = "Exit Monitor" };
+                itemExit.Click += (s, e) => {
+                    if (_bgTimer != null) _bgTimer.Dispose();
+                    win.Close();
+                    System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown();
+                };
 
                 MenuItem styleMenu = new MenuItem { Header = "Taskbar Style & Appearance" };
                 MenuItem styleNative = new MenuItem { Header = "Native Taskbar (Flush on Glass - Default)", IsCheckable = true, IsChecked = true };
                 MenuItem stylePill = new MenuItem { Header = "Fluent Capsule (Subtle Pill)", IsCheckable = true, IsChecked = false };
-                MenuItem styleCard = new MenuItem { Header = "Floating HUD Card (Original Frame)", IsCheckable = true, IsChecked = false };
+                MenuItem styleCard = new MenuItem { Header = "Floating HUD Card", IsCheckable = true, IsChecked = false };
 
                 styleNative.Click += (s, e) => {
                     _styleMode = 0;
@@ -460,186 +658,94 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                 IntPtr mainHwnd = IntPtr.Zero;
 
+                // Lightweight 1-second UI Timer (consumes < 0.05ms per tick)
                 DispatcherTimer timer = new DispatcherTimer(DispatcherPriority.Normal);
                 timer.Interval = TimeSpan.FromSeconds(1);
                 timer.Tick += (s, e) => {
                     try {
-                        int pdhCollectRes = -999;
-                        if (_hasPdh) {
-                            try { pdhCollectRes = PdhCollectQueryData(_hPdhQuery); } catch {}
+                        int cpu = _cachedCpu;
+                        txtCpu.Text = cpu + "%";
+                        txtCpu.Foreground = cpu >= 90 ? _brushRed : cpu >= 75 ? _brushAmber : _brushWhite;
+
+                        int ram = _cachedRam;
+                        txtRam.Text = ram + "%";
+                        txtRam.Foreground = ram >= 90 ? _brushRed : ram >= 75 ? _brushAmber : _brushWhite;
+
+                        int gpu = _cachedGpu;
+                        txtGpu.Text = gpu + "%";
+                        txtGpu.Foreground = gpu >= 90 ? _brushRed : gpu >= 75 ? _brushAmber : _brushWhite;
+
+                        txtGpuT.Text = _cachedGpuTempStr;
+                        txtGpuT.Foreground = _cachedGpuTempIsCritical ? _brushRed : _cachedGpuTempIsElevated ? _brushAmber : _brushWhite;
+
+                        if (_hasCpuTemp && _cachedCpuTempValid) {
+                            double ct = _cachedCpuTemp;
+                            txtCpuT.Text = Math.Round(ct) + "\u00B0C";
+                            txtCpuT.Foreground = ct >= 85 ? _brushRed : ct >= 75 ? _brushAmber : _brushWhite;
                         }
 
-                        // 1. CPU Utilization (matches Task Manager % Processor Utility)
-                        double pct = -1.0;
-                        if (_hasPdh && _hCpuCounter != IntPtr.Zero) {
-                            try {
-                                PDH_FMT_COUNTERVALUE cpuVal;
-                                if (PdhGetFormattedCounterValue(_hCpuCounter, PDH_FMT_DOUBLE, IntPtr.Zero, out cpuVal) == 0 && cpuVal.CStatus == 0) {
-                                    pct = Math.Max(0.0, Math.Min(100.0, cpuVal.doubleValue));
-                                }
-                            } catch {}
-                        }
-                        if (pct < 0.0) {
-                            long i, k, u;
-                            if (GetSystemTimes(out i, out k, out u)) {
-                                long tot = (k - _pKernel) + (u - _pUser);
-                                long idl = i - _pIdle;
-                                _pIdle = i; _pKernel = k; _pUser = u;
-                                pct = tot > 0 ? (double)(tot - idl) / tot * 100.0 : 0.0;
-                                pct = Math.Max(0.0, Math.Min(100.0, pct));
-                            } else {
-                                pct = 0.0;
-                            }
-                        }
-                        txtCpu.Text = ((int)Math.Round(pct, MidpointRounding.AwayFromZero)) + "%";
-                        txtCpu.Foreground = pct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : pct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
-
-                        // 2. RAM Utilization
-                        double totGb = 0, usedGb = 0, rPct = 0;
-                        MEMORYSTATUSEX mem = new MEMORYSTATUSEX();
-                        if (GlobalMemoryStatusEx(mem)) {
-                            totGb = mem.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
-                            usedGb = (mem.ullTotalPhys - mem.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
-                            rPct = totGb > 0 ? (usedGb / totGb) * 100.0 : 0;
-                            txtRam.Text = ((int)Math.Round(rPct, MidpointRounding.AwayFromZero)) + "%";
-                            txtRam.Foreground = rPct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : rPct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
-                        }
-
-                        // 3. GPU Utilization & Temperature (100% Task Manager Parity)
-                        double gpuPct = 0.0;
-                        string gpuTempStr = "N/A";
-                        SolidColorBrush gpuTempBrush = System.Windows.Media.Brushes.Gray;
-
-                        // A. Query NVIDIA discrete GPU metrics via NVML
-                        double nvmlGpu = 0.0;
-                        if (_hasNvml) {
-                            try {
-                                NvmlUtil ut;
-                                if (nvmlDeviceGetUtilizationRates(_nvmlDev, out ut) == 0) {
-                                    nvmlGpu = (double)ut.gpu;
-                                }
-                                uint temp;
-                                if (nvmlDeviceGetTemperature(_nvmlDev, 0, out temp) == 0 && temp > 0 && temp < 125) {
-                                    gpuTempStr = temp + "\u00B0C";
-                                    gpuTempBrush = temp >= 85 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : temp >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
-                                }
-                            } catch {}
-                        }
-
-                        // B. Query PDH for GPU Engine metrics (Task Manager engine parity)
-                        double pdhMaxEngine = 0.0;
-                        double intel3d = 0.0;
-                        if (_hasPdh && _hGpuCounter != IntPtr.Zero && (_gpuMode != 0 || !_hasNvml)) {
-                            try {
-                                uint bufSize = 0, count = 0;
-                                PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, IntPtr.Zero);
-                                if (bufSize > 0) {
-                                    IntPtr pBuf = Marshal.AllocHGlobal((int)bufSize);
-                                    try {
-                                        if (PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, pBuf) == 0) {
-                                            for (int idx = 0; idx < count; idx++) {
-                                                long baseOff = pBuf.ToInt64() + idx * 24;
-                                                uint status = (uint)Marshal.ReadInt32(new IntPtr(baseOff + 8));
-                                                if (status == 0) {
-                                                    double val = BitConverter.ToDouble(BitConverter.GetBytes(Marshal.ReadInt64(new IntPtr(baseOff + 16))), 0);
-                                                    if (!double.IsNaN(val) && !double.IsInfinity(val) && val > 0.01) {
-                                                        IntPtr szName = Marshal.ReadIntPtr(new IntPtr(baseOff), 0);
-                                                        string name = Marshal.PtrToStringUni(szName);
-                                                        if (name != null) {
-                                                            if (val > pdhMaxEngine) pdhMaxEngine = val;
-                                                            if (name.Contains("engtype_3D") && val > intel3d) intel3d = val;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    } finally {
-                                        Marshal.FreeHGlobal(pBuf);
-                                    }
-                                }
-                            } catch {}
-                        }
-
-                        // Select GPU based on mode (Mode 0: Discrete NVIDIA, Mode 1: Integrated Intel, Mode 2: Peak)
-                        if (_gpuMode == 0) {
-                            // Default: Discrete NVIDIA GPU (100% in sync with Task Manager GPU 1 and Sys_Mon)
-                            gpuPct = _hasNvml ? nvmlGpu : pdhMaxEngine;
-                            txtGpuT.Text = gpuTempStr;
-                            txtGpuT.Foreground = gpuTempBrush;
-                        } else if (_gpuMode == 1) {
-                            // Integrated Intel Iris Xe (100% in sync with Task Manager GPU 0)
-                            gpuPct = intel3d > 0 ? intel3d : pdhMaxEngine;
-                            txtGpuT.Text = "N/A";
-                            txtGpuT.Foreground = System.Windows.Media.Brushes.Gray;
-                        } else {
-                            // Auto / Peak Engine across all GPUs
-                            gpuPct = Math.Max(nvmlGpu, pdhMaxEngine);
-                            txtGpuT.Text = gpuTempStr;
-                            txtGpuT.Foreground = gpuTempBrush;
-                        }
-
-                        gpuPct = Math.Max(0.0, Math.Min(100.0, gpuPct));
-                        txtGpu.Text = ((int)Math.Round(gpuPct, MidpointRounding.AwayFromZero)) + "%";
-                        txtGpu.Foreground = gpuPct >= 90 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : gpuPct >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
-
-
-                        // Smart Auto-Detection: CPU Temperature
-                        double? cpuT = QueryCpuTemp();
-                        if (cpuT.HasValue && cpuT.Value > 15 && cpuT.Value < 115) {
-                            txtCpuT.Text = Math.Round(cpuT.Value) + "\u00B0C";
-                            txtCpuT.Foreground = cpuT.Value >= 85 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68)) : cpuT.Value >= 75 ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : System.Windows.Media.Brushes.White;
-                            if (pnlCpuT.Visibility != Visibility.Visible) {
-                                pnlCpuT.Visibility = Visibility.Visible;
-                                sepCpuT.Visibility = Visibility.Visible;
-                            }
-                        } else {
-                            if (pnlCpuT.Visibility != Visibility.Collapsed) {
-                                pnlCpuT.Visibility = Visibility.Collapsed;
-                                sepCpuT.Visibility = Visibility.Collapsed;
-                            }
-                        }
-
-                        // Smart Margin Detection: dynamically calculates equal margins on top, bottom, and left
-                        IntPtr curTray = FindWindow("Shell_TrayWnd", null);
-                        RECT rCurTray = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
-                        if (curTray != IntPtr.Zero) { GetWindowRect(curTray, out rCurTray); }
-                        int curTrayH = rCurTray.Bottom - rCurTray.Top;
-
-                        border.UpdateLayout();
-                        double contentH = border.ActualHeight > 0 ? border.ActualHeight : 36.0;
-                        int smartMargin = Math.Max(2, (int)Math.Round((curTrayH - contentH) / 2.0));
-
-                        if (isLocked) {
-                            try { _isSys_MonRunning = System.Diagnostics.Process.GetProcessesByName("Sys_MonSystemMonitor").Length > 0; } catch {}
-                            int targetX = _isSys_MonRunning ? (rCurTray.Left + 136) : (rCurTray.Left + 12);
-                            int targetY = rCurTray.Top + smartMargin;
-                            if (Math.Abs(win.Left - targetX) > 0.5 || Math.Abs(win.Top - targetY) > 0.5) {
-                                win.Left = targetX;
-                                win.Top = targetY;
-                            }
-                        }
-
-                        // Clean, minimal hover tooltip (no extra descriptions)
-                        string cpuLine = pnlCpuT.Visibility == Visibility.Visible 
+                        // Clean hover tooltip
+                        string cpuLine = (_hasCpuTemp && _cachedCpuTempValid)
                             ? string.Format("CPU: {0} ({1})", txtCpu.Text, txtCpuT.Text)
                             : string.Format("CPU: {0}", txtCpu.Text);
                         string gpuLine = _hasNvml 
                             ? string.Format("GPU: {0} ({1})", txtGpu.Text, txtGpuT.Text)
                             : string.Format("GPU: {0}", txtGpu.Text);
-                        string ramLine = string.Format("RAM: {0:F1} / {1:F1} GB ({2})", usedGb, totGb, txtRam.Text);
-
+                        string ramLine = string.Format("RAM: {0:F1} / {1:F1} GB ({2})", _cachedUsedGb, _cachedTotGb, txtRam.Text);
                         tt.Content = string.Format("{0}\n{1}\n{2}", cpuLine, gpuLine, ramLine);
 
-                        // Maintain Z-order anchored directly to the Taskbar surface (auto-hide if fullscreen app is active)
-                        if (mainHwnd != IntPtr.Zero) {
-                            if (IsFullscreenApp(curTray)) {
-                                if (win.Visibility != Visibility.Collapsed) win.Visibility = Visibility.Collapsed;
-                            } else {
-                                if (win.Visibility != Visibility.Visible) win.Visibility = Visibility.Visible;
-                                if (curTray != IntPtr.Zero) {
-                                    SetWindowLongPtr(mainHwnd, -8, curTray); // Keep taskbar as explicit Win32 owner
+                        // Position checking without heavy process enumeration
+                        IntPtr curTray = FindWindow("Shell_TrayWnd", null);
+                        if (curTray != IntPtr.Zero) {
+                            RECT rCurTray;
+                            GetWindowRect(curTray, out rCurTray);
+                            int curTrayH = rCurTray.Bottom - rCurTray.Top;
+
+                            if (curTrayH != _lastTrayH && curTrayH > 20) {
+                                _lastTrayH = curTrayH;
+                                double contentH = border.ActualHeight > 0 ? border.ActualHeight : 34.0;
+                                _cachedSmartMargin = Math.Max(2, (int)Math.Round((curTrayH - contentH) / 2.0));
+                            }
+
+                            if (isLocked) {
+                                int targetX = rCurTray.Left + 12;
+                                IntPtr hSys_Mon = FindWindow("Sys_MonOverlayWndClass_Main", null);
+                                if (hSys_Mon != IntPtr.Zero && IsWindowVisible(hSys_Mon)) {
+                                    RECT rK;
+                                    if (GetWindowRect(hSys_Mon, out rK) && rK.Right > 0 && rK.Right < 300) {
+                                        targetX = rK.Right + 8; // Clean 8px gap beside Sys_Mon
+                                    }
                                 }
-                                SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
+                                int targetY = rCurTray.Top + _cachedSmartMargin;
+                                if (Math.Abs(win.Left - targetX) > 1.0 || Math.Abs(win.Top - targetY) > 1.0) {
+                                    win.Left = targetX;
+                                    win.Top = targetY;
+                                }
+                            }
+
+                            // Re-bind Win32 owner ONLY if tray handle changed (e.g. Explorer restart)
+                            if (mainHwnd != IntPtr.Zero && curTray != _lastTrayHwnd) {
+                                _lastTrayHwnd = curTray;
+                                try {
+                                    SetWindowLongPtr(mainHwnd, -8, curTray);
+                                    SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
+                                } catch {}
+                            }
+
+                            // Debounced fullscreen check
+                            if (mainHwnd != IntPtr.Zero) {
+                                bool isFs = IsFullscreenApp(curTray);
+                                if (isFs) {
+                                    _consecutiveFullscreenTicks++;
+                                } else {
+                                    _consecutiveFullscreenTicks = 0;
+                                }
+
+                                if (_consecutiveFullscreenTicks >= 2) {
+                                    if (win.Visibility != Visibility.Collapsed) win.Visibility = Visibility.Collapsed;
+                                } else {
+                                    if (win.Visibility != Visibility.Visible) win.Visibility = Visibility.Visible;
+                                }
                             }
                         }
                     } catch {}
@@ -650,33 +756,17 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                     int style = GetWindowLong(mainHwnd, -20);
                     SetWindowLong(mainHwnd, -20, style | 0x08000080);
 
-                    // Set Shell_TrayWnd as explicit Win32 Owner (GWLP_HWNDPARENT = -8) so DWM renders widget above taskbar
                     if (tray != IntPtr.Zero) {
                         SetWindowLongPtr(mainHwnd, -8, tray);
                     }
 
-                    // Ensure window stays directly on top of the taskbar glass in the Topmost band
-                    SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040);
+                    // Topmost band placement
+                    SetWindowPos(mainHwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
 
-                    // Immediate initial layout update for smart margin
-                    border.UpdateLayout();
-                    double h = border.ActualHeight > 0 ? border.ActualHeight : 34.0;
-                    int sm = Math.Max(2, (int)Math.Round(((rTray.Bottom - rTray.Top) - h) / 2.0));
-                    if (posX <= 0) {
-                        try { _isSys_MonRunning = System.Diagnostics.Process.GetProcessesByName("Sys_MonSystemMonitor").Length > 0; } catch {}
-                        win.Left = _isSys_MonRunning ? (rTray.Left + 136) : (rTray.Left + 12);
-                        win.Top = rTray.Top + sm;
-                    }
+                    // Start background hardware polling timer
+                    _bgTimer = new Timer(PollHardware, null, 1000, 1000);
 
-                    try {
-                        if (PdhOpenQuery(null, IntPtr.Zero, out _hPdhQuery) == 0) {
-                            PdhAddEnglishCounter(_hPdhQuery, @"\Processor Information(_Total)\% Processor Time", IntPtr.Zero, out _hCpuCounter);
-                            PdhAddEnglishCounter(_hPdhQuery, @"\GPU Engine(*)\Utilization Percentage", IntPtr.Zero, out _hGpuCounter);
-                            PdhCollectQueryData(_hPdhQuery);
-                            _hasPdh = true;
-                        }
-                    } catch {}
-
+                    // Start UI timer
                     timer.Start();
 
                     if (!string.IsNullOrEmpty(capPath)) {
@@ -704,7 +794,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
             t.SetApartmentState(ApartmentState.STA);
             t.IsBackground = false;
             t.Start();
-            t.Join(); // Keep main thread alive!
+            t.Join();
         }
 
         private static StackPanel CreateItem(string label, TextBlock valBlock) {
@@ -713,13 +803,13 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center, 
                 Margin = new Thickness(3, 0, 3, 0),
-                MinWidth = 30
+                MinWidth = 32
             };
             TextBlock lbl = new TextBlock { 
                 Text = label, 
                 FontSize = 10.0, 
                 FontWeight = FontWeights.SemiBold, 
-                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(156, 163, 175)), 
+                Foreground = _brushGray, 
                 HorizontalAlignment = HorizontalAlignment.Center, 
                 TextAlignment = TextAlignment.Center, 
                 Margin = new Thickness(0, 0, 0, 1) 
@@ -735,7 +825,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
             return new System.Windows.Shapes.Rectangle { 
                 Width = 1, 
                 Height = 18, 
-                Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 255, 255, 255)), 
+                Fill = _sepBrush, 
                 VerticalAlignment = VerticalAlignment.Center, 
                 Margin = new Thickness(4, 0, 4, 0) 
             };
