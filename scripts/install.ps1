@@ -41,8 +41,6 @@ if (Test-Path "$PSScriptRoot\Win11TaskbarMonitor.exe") {
     $sourceExe = "$PSScriptRoot\Win11TaskbarMonitor.exe"
 } elseif (Test-Path "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App\Win11TaskbarMonitor.exe") {
     $sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App\Win11TaskbarMonitor.exe"
-} elseif (Test-Path "$PSScriptRoot\..\dist\Win11TaskbarMonitor-Standalone\Win11TaskbarMonitor.exe") {
-    $sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor-Standalone\Win11TaskbarMonitor.exe"
 } elseif (Test-Path "$PSScriptRoot\..\dist\Win11TaskbarMonitor.exe") {
     $sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor.exe"
 } else {
@@ -51,7 +49,7 @@ if (Test-Path "$PSScriptRoot\Win11TaskbarMonitor.exe") {
     $env:Path = "$dotnetRoot;" + $env:Path
     if (Get-Command dotnet -ErrorAction SilentlyContinue) {
         Write-Host "`n[*] Building release executable..." -ForegroundColor Yellow
-        & dotnet publish "$PSScriptRoot\..\src\WinTaskbarMonitor\WinTaskbarMonitor.csproj" -c Release -r win-x64 --self-contained false -o "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App" 2>$null | Out-Null
+        & dotnet publish "$PSScriptRoot\..\src\NativeMonitor\NativeMonitor.csproj" -c Release -r win-x64 --self-contained false -o "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App" 2>$null | Out-Null
         if (Test-Path "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App\Win11TaskbarMonitor.exe") {
             $sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App\Win11TaskbarMonitor.exe"
             $sourceAppDir = "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App"
@@ -87,8 +85,9 @@ Write-Host "`n[*] Installing to ($Scope): $installDir" -ForegroundColor Gray
 $running = Get-Process | Where-Object { $_.ProcessName -match "Win11TaskbarMonitor|WinTaskbarMonitor" }
 if ($running) {
     Write-Host "[*] Stopping running instance..." -ForegroundColor Yellow
-    $running | Stop-Process -Force
-    Start-Sleep -Milliseconds 500
+    $running | Stop-Process -Force -ErrorAction SilentlyContinue
+    $running | ForEach-Object { try { $_.WaitForExit(3000) } catch {} }
+    Start-Sleep -Milliseconds 800
 }
 
 # 3. Create target directory and copy files

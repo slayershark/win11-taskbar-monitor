@@ -18,8 +18,6 @@ New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
 # 2. Copy application binaries & scripts
 if (Test-Path "$distDir\Win11TaskbarMonitor-App") {
     Copy-Item "$distDir\Win11TaskbarMonitor-App\*" "$packageDir" -Recurse -Force
-} elseif (Test-Path "$distDir\Win11TaskbarMonitor-Standalone\Win11TaskbarMonitor.exe") {
-    Copy-Item "$distDir\Win11TaskbarMonitor-Standalone\Win11TaskbarMonitor.exe" "$packageDir\Win11TaskbarMonitor.exe" -Force
 } elseif (Test-Path "$distDir\Win11TaskbarMonitor.exe") {
     Copy-Item "$distDir\Win11TaskbarMonitor.exe" "$packageDir\Win11TaskbarMonitor.exe" -Force
 }
