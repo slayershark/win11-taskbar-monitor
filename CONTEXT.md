@@ -21,7 +21,7 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `1875bd5` (fix: resolve taskbar occlusion and add fullscreen auto-hide)
+  - Latest Commit: `828035e` (fix: enable silent detached execution without cmd window and enforce taskbar z-order ownership)
 
 ---
 
