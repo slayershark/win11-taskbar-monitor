@@ -21,7 +21,7 @@
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `828035e` (fix: enable silent detached execution without cmd window and enforce taskbar z-order ownership)
+  - Latest Commit: `949ea05` (fix: decouple hardware polling to background thread, eliminate launch flickering and DWM composition churn)
 
 ---
 
