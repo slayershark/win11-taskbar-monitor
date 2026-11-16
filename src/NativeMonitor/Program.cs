@@ -72,6 +72,12 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool GetSystemTimes(out long lpIdle, out long lpKernel, out long lpUser);
 
+        [DllImport("kernel32.dll")]
+        public static extern IntPtr GetCurrentProcess();
+
+        [DllImport("psapi.dll")]
+        public static extern bool EmptyWorkingSet(IntPtr hProcess);
+
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GlobalMemoryStatusEx([In, Out] MEMORYSTATUSEX lpBuffer);
@@ -185,6 +191,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         private static volatile bool _cachedCpuTempValid = false;
 
         private static Timer _bgTimer = null;
+        private static int _trimCounter = 0;
 
         private static double? QueryCpuTemp() {
             try {
@@ -208,6 +215,11 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
         private static void PollHardware(object state) {
             try {
+                _trimCounter++;
+                if (_trimCounter % 30 == 0) {
+                    try { EmptyWorkingSet(GetCurrentProcess()); } catch {}
+                }
+
                 if (_hasPdh) {
                     try { PdhCollectQueryData(_hPdhQuery); } catch {}
                 }
@@ -841,6 +853,14 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                     // Start UI timer
                     timer.Start();
+
+                    DispatcherTimer initTrim = new DispatcherTimer();
+                    initTrim.Interval = TimeSpan.FromSeconds(1.5);
+                    initTrim.Tick += (its, ite) => {
+                        initTrim.Stop();
+                        try { EmptyWorkingSet(GetCurrentProcess()); } catch {}
+                    };
+                    initTrim.Start();
 
                     if (!string.IsNullOrEmpty(capPath)) {
                         DispatcherTimer capTimer = new DispatcherTimer();

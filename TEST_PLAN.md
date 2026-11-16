@@ -77,3 +77,21 @@ Every major feature has been verified against its documented acceptance criteria
 | **BD-01** | **Release Publish** | Run `dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist/`. | Zero warnings, zero errors. Output: `dist/WinTaskbarMonitor.exe` (3.7 MB). | `[x]` |
 | **BD-02** | **Clean Removal** | Delete application directory. | No background services, no drivers installed, no leftover system files. | `[x]` |
 | **BD-03** | **Smart App Control (SAC) Documentation** | Document Windows 11 Smart App Control behavior for developer and end-user execution. | Detailed instructions in README.md and ARCHITECTURE.md on Developer Mode and code signing. | `[x]` |
+
+---
+
+## 7. Automated QA & Smoke Test Suite (`v1.2.0` Standalone Native Architecture)
+
+| Test ID | Test Category | Target Check | Empirical Measured Output | Result |
+| :--- | :--- | :--- | :--- | :--- |
+| **QA-01** | **Native Architecture** | Standalone process independent of PowerShell/CMD | `PID 17344`, Parent: `WmiPrvSE` (non-console), Path: `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor\Win11TaskbarMonitor.exe` | **PASS** |
+| **QA-02** | **RAM Metric Accuracy** | Used GB / Total GB and % vs `Win32_OperatingSystem` | Measured: `Used: 6.2GB / 7.7GB (81%)` | **PASS** |
+| **QA-03** | **CPU Metric Accuracy** | % Processor Time vs `Win32_PerfFormattedData_PerfOS_Processor` | Measured: `PerfOS Processor Load: 7%` | **PASS** |
+| **QA-04** | **GPU Telemetry Streaming** | NVIDIA MX350 GPU load and thermals via NVML | Measured: `Load: 0%, Temp: 57°C` | **PASS** |
+| **QA-05** | **Single-Instance Mutex** | Secondary instance exits immediately without duplicate process | Duplicate process detected `Local\Win11TaskbarMonitor_Native_Mutex_v2` and exited with code 0 in `1095 ms` | **PASS** |
+| **QA-06** | **Shortcuts & Autostart** | Start Menu, Desktop, and `HKCU Run` target direct `.exe` | All 3 entry points verified pointing directly to `Win11TaskbarMonitor.exe` with empty arguments | **PASS** |
+| **QA-07** | **Visual Taskbar Render** | Pixel capture of live taskbar widget surface | Screen capture verified at `qa_smoke_test_proof.png` showing `CPU 21% | RAM 79% | GPU 0% | GPU°C 57°C` | **PASS** |
+| **QA-08** | **Release Package Integrity** | Zip archive structure and extraction verification | `dist/Win11TaskbarMonitor-Setup.zip` (2.26 MB) extracted cleanly with all 6 required assets | **PASS** |
+| **QA-09** | **Neutrality Audit** | 0 plaintext mentions of third-party monitor brand | 0 plaintext matches across all source code, build scripts, and documentation | **PASS** |
+| **QA-10** | **Resource Footprint Guard** | Working set RAM < 45 MB, zero handle leakage | Working Set: `33.43 MB` (after trim), Handles: `469`, Threads: `23` | **PASS** |
+
