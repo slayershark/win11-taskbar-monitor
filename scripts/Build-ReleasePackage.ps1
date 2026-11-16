@@ -16,7 +16,13 @@ if (Test-Path $packageDir) {
 New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
 
 # 2. Copy application binaries & scripts
-Copy-Item "$distDir\Win11TaskbarMonitor.exe" "$packageDir\Win11TaskbarMonitor.exe" -Force
+if (Test-Path "$distDir\Win11TaskbarMonitor-App") {
+    Copy-Item "$distDir\Win11TaskbarMonitor-App\*" "$packageDir" -Recurse -Force
+} elseif (Test-Path "$distDir\Win11TaskbarMonitor-Standalone\Win11TaskbarMonitor.exe") {
+    Copy-Item "$distDir\Win11TaskbarMonitor-Standalone\Win11TaskbarMonitor.exe" "$packageDir\Win11TaskbarMonitor.exe" -Force
+} elseif (Test-Path "$distDir\Win11TaskbarMonitor.exe") {
+    Copy-Item "$distDir\Win11TaskbarMonitor.exe" "$packageDir\Win11TaskbarMonitor.exe" -Force
+}
 Copy-Item "$PSScriptRoot\Run-WinTaskbarMonitor.ps1" "$packageDir\Run-WinTaskbarMonitor.ps1" -Force
 Copy-Item "$PSScriptRoot\LiveDaemon.cs" "$packageDir\LiveDaemon.cs" -Force
 Copy-Item "$PSScriptRoot\Launch-Silent.vbs" "$packageDir\Launch-Silent.vbs" -Force

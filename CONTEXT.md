@@ -4,7 +4,7 @@
 
 **Project**: Win11TaskbarMonitor  
 **Objective**: Build a lightweight, native, and highly reliable Windows 11 taskbar hardware telemetry utility (CPU, GPU, CPU Temp, GPU Temp, RAM) without bloat, web dependencies, or excessive resource overhead.  
-**Current Milestone**: Rebranded to **Win11TaskbarMonitor**. Application is fully built, tested, published to `dist/`, packaged into a universal 1-click standalone distribution (`dist/Win11TaskbarMonitor-Setup.zip`), and **installed onto the host system** at `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor` with Start Menu and Desktop shortcuts configured.
+**Current Milestone**: Migrated to standalone native Windows executable (`Win11TaskbarMonitor.exe`). Application runs independently with zero PowerShell or CMD dependency, sequence arranged as `CPU | RAM | GPU | GPU°C`, zero third-party references, top-popping hover tooltip, and packaged into universal release zip (`dist/Win11TaskbarMonitor-Setup.zip`). Installed onto the host system at `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor`.
 
 ---
 
@@ -14,19 +14,28 @@
 - **CPU**: 11th Gen Intel(R) Core(TM) i5-1135G7 (4 cores, 8 threads)
 - **GPUs Detected & Monitored**:
   1. Intel(R) Iris(R) Xe Graphics (Integrated)
-  2. NVIDIA GeForce MX350 (Discrete, verified at 59°C via NVML)
+  2. NVIDIA GeForce MX350 (Discrete, verified at 61°C via NVML)
 - **Runtime & SDK**: .NET 8 SDK 8.0.428 in `%LOCALAPPDATA%\dotnet`.
+- **Active Process**: PID 21668 (`Win11TaskbarMonitor.exe` standalone native process).
 - **Git Repository**: Initialized locally in `d:\WinTaskbarMonitor`.
   - Identity configured at repo level:
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master`
-  - Latest Commit: `949ea05` (fix: decouple hardware polling to background thread, eliminate launch flickering and DWM composition churn)
 
 ---
 
 ## 3. Completed Features
 
+- [x] **Native Executable Architecture (Zero PowerShell/CMD Dependency)**:
+  - Migrated entire application from PowerShell/WScript runner to compiled native Windows executable `Win11TaskbarMonitor.exe` (`src/NativeMonitor`).
+  - Native STAThread entry point with thread-safe background polling worker, decoupled `Win32_Process` creation, and `Local\Win11TaskbarMonitor_Native_Mutex_v2`.
+  - Closing PowerShell, CMD, or terminal windows does not terminate `Win11TaskbarMonitor.exe`.
+  - Start Menu shortcut, Desktop shortcut, and `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` target `Win11TaskbarMonitor.exe` directly.
+- [x] **Metric Sequence Rearrangement (`CPU | RAM | GPU | GPU ° C`) & Zero Third-Party Mentions**:
+  - Exact requested order: `CPU | RAM | GPU | GPU°C`.
+  - Hover tooltip order aligned: CPU -> RAM -> GPU.
+  - Zero explicit references to third-party monitor brand names across source, UI, and documentation.
 - [x] **Top-Popping Hover Tooltip & Permanent Z-Order Fix**:
   - Replaced fragile `ContentControl.Content` string re-assignment with in-place `ttText.Text` updates inside the 1-second UI timer, completely preventing WPF visual tree teardown and eliminating the bug where the tooltip slipped behind the widget or disappeared after 1 second.
   - Replaced standard WPF `ToolTip` with an explicit `Popup` configured with `Placement = PlacementMode.Top`, `PlacementTarget = border`, and `VerticalOffset = -6`, positioning the tooltip cleanly in the desktop area directly above the taskbar widget (never overlapping or clipping against taskbar bezels).

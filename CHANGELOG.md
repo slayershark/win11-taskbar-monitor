@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.2.0] - 2026-11-16
+
+### Added
+- **Native Executable Architecture Migration (`Win11TaskbarMonitor.exe`)**:
+  - Re-architected application delivery from PowerShell / WScript script execution to a compiled standalone native Windows executable (`Win11TaskbarMonitor.exe`).
+  - Implemented standalone C# entry point (`src/NativeMonitor`) compiled as a lightweight, native WinExe with STAThread, thread-safe background hardware polling, and `Win32_Process` decoupled lifecycle.
+  - Eliminated all dependencies on `powershell.exe`, `wscript.exe`, and terminal windows. The monitor is now an independent native process that does not close when PowerShell or command prompt windows are closed.
+  - Configured Start Menu shortcut, Desktop shortcut, and `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` autostart to target `Win11TaskbarMonitor.exe` directly with zero arguments.
+  - Resolved Smart App Control (SAC) blocks by utilizing direct native execution with `Mutex v2` (`Local\Win11TaskbarMonitor_Native_Mutex_v2`).
+  - Rebuilt Release setup package at `dist/Win11TaskbarMonitor-Setup.zip` (2.26 MB).
+
+---
+
 ## [1.1.11] - 2026-11-16
 
 ### Changed

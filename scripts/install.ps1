@@ -29,9 +29,20 @@ Write-Host "        Win11TaskbarMonitor — System Installation         " -Foreg
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # 1. Resolve source files (supports both repo structure and standalone release folder)
+$sourceAppDir = $null
+if (Test-Path "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App") {
+    $sourceAppDir = "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App"
+} elseif (Test-Path "$PSScriptRoot\Win11TaskbarMonitor-App") {
+    $sourceAppDir = "$PSScriptRoot\Win11TaskbarMonitor-App"
+}
+
 $sourceExe = $null
 if (Test-Path "$PSScriptRoot\Win11TaskbarMonitor.exe") {
     $sourceExe = "$PSScriptRoot\Win11TaskbarMonitor.exe"
+} elseif (Test-Path "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App\Win11TaskbarMonitor.exe") {
+    $sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App\Win11TaskbarMonitor.exe"
+} elseif (Test-Path "$PSScriptRoot\..\dist\Win11TaskbarMonitor-Standalone\Win11TaskbarMonitor.exe") {
+    $sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor-Standalone\Win11TaskbarMonitor.exe"
 } elseif (Test-Path "$PSScriptRoot\..\dist\Win11TaskbarMonitor.exe") {
     $sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor.exe"
 } else {
@@ -40,9 +51,10 @@ if (Test-Path "$PSScriptRoot\Win11TaskbarMonitor.exe") {
     $env:Path = "$dotnetRoot;" + $env:Path
     if (Get-Command dotnet -ErrorAction SilentlyContinue) {
         Write-Host "`n[*] Building release executable..." -ForegroundColor Yellow
-        & dotnet publish "$PSScriptRoot\..\src\WinTaskbarMonitor\WinTaskbarMonitor.csproj" -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o "$PSScriptRoot\..\dist" 2>$null | Out-Null
-        if (Test-Path "$PSScriptRoot\..\dist\Win11TaskbarMonitor.exe") {
-            $sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor.exe"
+        & dotnet publish "$PSScriptRoot\..\src\WinTaskbarMonitor\WinTaskbarMonitor.csproj" -c Release -r win-x64 --self-contained false -o "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App" 2>$null | Out-Null
+        if (Test-Path "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App\Win11TaskbarMonitor.exe") {
+            $sourceExe = "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App\Win11TaskbarMonitor.exe"
+            $sourceAppDir = "$PSScriptRoot\..\dist\Win11TaskbarMonitor-App"
         }
     }
 }
@@ -84,7 +96,10 @@ if (!(Test-Path $installDir)) {
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 }
 
-if ($sourceExe -and (Test-Path $sourceExe)) {
+if ($sourceAppDir -and (Test-Path $sourceAppDir)) {
+    Copy-Item -Path "$sourceAppDir\*" -Destination $installDir -Recurse -Force
+    Get-ChildItem -Path $installDir -Filter "*.exe" | ForEach-Object { Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue }
+} elseif ($sourceExe -and (Test-Path $sourceExe)) {
     Copy-Item -Path $sourceExe -Destination $targetExe -Force
     Unblock-File -Path $targetExe -ErrorAction SilentlyContinue
 }
@@ -104,21 +119,21 @@ $targetIco = "$installDir\app.ico"
 if ($sourceIco -and (Test-Path $sourceIco)) {
     Copy-Item -Path $sourceIco -Destination $targetIco -Force
 }
-Write-Host "[+] Copied application files, icons, and silent runner" -ForegroundColor Green
+Write-Host "[+] Copied native application files and dependencies" -ForegroundColor Green
 
 # Remove legacy WinTaskbarMonitor shortcuts if present
 Remove-Item "$startMenuDir\WinTaskbarMonitor.lnk" -ErrorAction SilentlyContinue
 Remove-Item "$desktopPath\WinTaskbarMonitor.lnk" -ErrorAction SilentlyContinue
 
-# 4. Create Start Menu Shortcut (Using silent runner to prevent SAC policy blocks and eliminate cmd window)
+# 4. Create Start Menu Shortcut (Native Standalone Executable)
 $shortcutPath = "$startMenuDir\Win11TaskbarMonitor.lnk"
 $wshShell = New-Object -ComObject WScript.Shell
 $shortcut = $wshShell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath = "wscript.exe"
-$shortcut.Arguments = "`"$installDir\Launch-Silent.vbs`""
+$shortcut.TargetPath = "$installDir\Win11TaskbarMonitor.exe"
+$shortcut.Arguments = ""
 $shortcut.WorkingDirectory = $installDir
 $shortcut.Description = "Lightweight Windows 11 Taskbar System Monitor"
-$shortcut.IconLocation = if (Test-Path $targetIco) { "$targetIco,0" } else { "$targetExe,0" }
+$shortcut.IconLocation = if (Test-Path $targetIco) { "$targetIco,0" } else { "$installDir\Win11TaskbarMonitor.exe,0" }
 $shortcut.Save()
 Write-Host "[+] Created Start Menu shortcut in $startMenuDir" -ForegroundColor Green
 
@@ -126,11 +141,11 @@ Write-Host "[+] Created Start Menu shortcut in $startMenuDir" -ForegroundColor G
 if ($CreateDesktopShortcut) {
     $desktopShortcut = "$desktopPath\Win11TaskbarMonitor.lnk"
     $scDesktop = $wshShell.CreateShortcut($desktopShortcut)
-    $scDesktop.TargetPath = "wscript.exe"
-    $scDesktop.Arguments = "`"$installDir\Launch-Silent.vbs`""
+    $scDesktop.TargetPath = "$installDir\Win11TaskbarMonitor.exe"
+    $scDesktop.Arguments = ""
     $scDesktop.WorkingDirectory = $installDir
     $scDesktop.Description = "Lightweight Windows 11 Taskbar System Monitor"
-    $scDesktop.IconLocation = if (Test-Path $targetIco) { "$targetIco,0" } else { "$targetExe,0" }
+    $scDesktop.IconLocation = if (Test-Path $targetIco) { "$targetIco,0" } else { "$installDir\Win11TaskbarMonitor.exe,0" }
     $scDesktop.Save()
     Write-Host "[+] Created Desktop shortcut" -ForegroundColor Green
 }
@@ -143,7 +158,7 @@ if (!(Test-Path $uninstallKey)) {
 $exeSizeKb = [Math]::Round((Get-Item $targetExe).Length / 1KB)
 
 Set-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "Win11TaskbarMonitor"
-Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.1.7"
+Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.2.0"
 Set-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "slayershark"
 Set-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $installDir
 $displayIcon = if (Test-Path $targetIco) { "$targetIco,0" } else { "$targetExe,0" }
@@ -154,22 +169,25 @@ Set-ItemProperty -Path $uninstallKey -Name "NoModify" -Value 1 -Type DWord
 Set-ItemProperty -Path $uninstallKey -Name "NoRepair" -Value 1 -Type DWord
 Write-Host "[+] Registered in Windows Installed Apps" -ForegroundColor Green
 
-# 7. Optional Start with Windows (100% Silent execution with zero console/cmd window)
+# 7. Optional Start with Windows (Native Direct Executable, Zero PowerShell/CMD dependency)
 if ($StartWithWindows) {
     $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-    $runVal = "wscript.exe `"$installDir\Launch-Silent.vbs`""
+    $runVal = "`"$installDir\Win11TaskbarMonitor.exe`""
     Set-ItemProperty -Path $runKey -Name "Win11TaskbarMonitor" -Value $runVal
     Remove-ItemProperty -Path $runKey -Name "WinTaskbarMonitor" -ErrorAction SilentlyContinue
-    Write-Host "[+] Enabled Start with Windows (100% Silent Background Execution, No CMD Window)" -ForegroundColor Green
+    Write-Host "[+] Enabled Start with Windows (Native Executable, No CMD/PowerShell Dependency)" -ForegroundColor Green
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Cyan
 Write-Host "          Installation Completed Successfully!            " -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "Win11TaskbarMonitor is now installed." -ForegroundColor White
-Write-Host "Zero-policy runner enables seamless execution without Developer Mode." -ForegroundColor White
+Write-Host "Win11TaskbarMonitor is now installed as a native Windows executable." -ForegroundColor White
+Write-Host "Runs independently with zero PowerShell or terminal window dependency." -ForegroundColor White
 
 if ($LaunchAfterInstall) {
-    Write-Host "`n[*] Launching Win11TaskbarMonitor silently..." -ForegroundColor Yellow
-    Start-Process wscript.exe -ArgumentList "`"$installDir\Launch-Silent.vbs`""
+    Write-Host "`n[*] Launching Win11TaskbarMonitor native executable..." -ForegroundColor Yellow
+    $res = ([wmiclass]"Win32_Process").Create("$installDir\Win11TaskbarMonitor.exe")
+    if ($res.ReturnValue -ne 0) {
+        Start-Process "$installDir\Win11TaskbarMonitor.exe"
+    }
 }

@@ -131,21 +131,6 @@
             </StackPanel>
 
             <Rectangle Style="{StaticResource SeparatorStyle}"
-                       Visibility="{Binding ShowCpuTemp, Converter={StaticResource BoolToVis}}" />
-
-            <!-- CPU Temp -->
-            <StackPanel Style="{StaticResource MetricContainerStyle}"
-                        Visibility="{Binding ShowCpuTemp, Converter={StaticResource BoolToVis}}"
-                        ToolTip="{Binding CpuTempTooltip}">
-                <TextBlock Text="CPU°" Style="{StaticResource MetricLabelStyle}" />
-                <TextBlock Text="{Binding CpuTempValue}"
-                           Foreground="{Binding CpuTempBrush}"
-                           Style="{StaticResource MetricValueStyle}"
-                           MinWidth="34"
-                           TextAlignment="Center" />
-            </StackPanel>
-
-            <Rectangle Style="{StaticResource SeparatorStyle}"
                        Visibility="{Binding ShowRam, Converter={StaticResource BoolToVis}}" />
 
             <!-- RAM Usage -->
@@ -185,6 +170,21 @@
                 <TextBlock Text="GPU°C" Style="{StaticResource MetricLabelStyle}" />
                 <TextBlock Text="{Binding GpuTempValue}"
                            Foreground="{Binding GpuTempBrush}"
+                           Style="{StaticResource MetricValueStyle}"
+                           MinWidth="34"
+                           TextAlignment="Center" />
+            </StackPanel>
+
+            <!-- CPU Temp (Optional fallback if enabled in settings) -->
+            <Rectangle Style="{StaticResource SeparatorStyle}"
+                       Visibility="{Binding ShowCpuTemp, Converter={StaticResource BoolToVis}}" />
+
+            <StackPanel Style="{StaticResource MetricContainerStyle}"
+                        Visibility="{Binding ShowCpuTemp, Converter={StaticResource BoolToVis}}"
+                        ToolTip="{Binding CpuTempTooltip}">
+                <TextBlock Text="CPU°" Style="{StaticResource MetricLabelStyle}" />
+                <TextBlock Text="{Binding CpuTempValue}"
+                           Foreground="{Binding CpuTempBrush}"
                            Style="{StaticResource MetricValueStyle}"
                            MinWidth="34"
                            TextAlignment="Center" />
