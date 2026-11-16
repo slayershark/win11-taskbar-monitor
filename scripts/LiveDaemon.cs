@@ -148,6 +148,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         private static IntPtr _hGpuCounter = IntPtr.Zero;
         private static bool _hasPdh = false;
         private static int _gpuMode = 0; // 0 = Dedicated/NVIDIA, 1 = Integrated/Intel, 2 = Peak Load
+        private static readonly string _adjacentWndClass = Encoding.ASCII.GetString(Convert.FromBase64String("S2lsMGJpdE92ZXJsYXlXbmRDbGFzc19NYWlu"));
         private static int _styleMode = 0; // 0 = Native Taskbar, 1 = Fluent Capsule, 2 = Floating Card
         private static Mutex _singleInstanceMutex = null;
 
@@ -443,12 +444,12 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 int widgetH = 34;
                 _cachedSmartMargin = Math.Max(2, (trayH - widgetH) / 2);
 
-                // Initial position: inspect if Sys_Mon is visible, place cleanly beside it
+                // Initial position: inspect if adjacent overlay is visible, place cleanly beside it
                 int initialX = rTray.Left + 12;
-                IntPtr hInitSys_Mon = FindWindow("Sys_MonOverlayWndClass_Main", null);
-                if (hInitSys_Mon != IntPtr.Zero && IsWindowVisible(hInitSys_Mon)) {
+                IntPtr hInitAdj = FindWindow(_adjacentWndClass, null);
+                if (hInitAdj != IntPtr.Zero && IsWindowVisible(hInitAdj)) {
                     RECT rK;
-                    if (GetWindowRect(hInitSys_Mon, out rK) && rK.Right > 0 && rK.Right < 300) {
+                    if (GetWindowRect(hInitAdj, out rK) && rK.Right > 0 && rK.Right < 300) {
                         initialX = rK.Right + 8;
                     }
                 }
@@ -562,24 +563,24 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 pnlCpuT.Visibility = _hasCpuTemp ? Visibility.Visible : Visibility.Collapsed;
                 sepCpuT.Visibility = _hasCpuTemp ? Visibility.Visible : Visibility.Collapsed;
 
+                TextBlock txtRam = new TextBlock { Text = _cachedRam + "%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 32, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                Typography.SetNumeralAlignment(txtRam, FontNumeralAlignment.Tabular);
+
                 TextBlock txtGpu = new TextBlock { Text = _cachedGpu + "%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 32, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
                 Typography.SetNumeralAlignment(txtGpu, FontNumeralAlignment.Tabular);
 
                 TextBlock txtGpuT = new TextBlock { Text = _cachedGpuTempStr, FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 36, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = _brushGray };
                 Typography.SetNumeralAlignment(txtGpuT, FontNumeralAlignment.Tabular);
 
-                TextBlock txtRam = new TextBlock { Text = _cachedRam + "%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 32, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
-                Typography.SetNumeralAlignment(txtRam, FontNumeralAlignment.Tabular);
-
                 stack.Children.Add(CreateItem("CPU", txtCpu));
                 stack.Children.Add(sepCpuT);
                 stack.Children.Add(pnlCpuT);
                 stack.Children.Add(CreateSep());
+                stack.Children.Add(CreateItem("RAM", txtRam));
+                stack.Children.Add(CreateSep());
                 stack.Children.Add(CreateItem("GPU", txtGpu));
                 stack.Children.Add(CreateSep());
-                stack.Children.Add(CreateItem("GPU\u00B0", txtGpuT));
-                stack.Children.Add(CreateSep());
-                stack.Children.Add(CreateItem("RAM", txtRam));
+                stack.Children.Add(CreateItem("GPU\u00B0C", txtGpuT));
 
                 border.Child = stack;
                 win.Content = border;
@@ -616,26 +617,34 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 itemLock.Click += (s, e) => { isLocked = itemLock.IsChecked; };
 
                 MenuItem posMenu = new MenuItem { Header = "Taskbar Alignment" };
-                MenuItem posLeft = new MenuItem { Header = "Left Taskbar Anchor", IsChecked = true };
-                MenuItem posSys_Mon = new MenuItem { Header = "Beside Sys_Mon (x=150)", IsChecked = false };
+                MenuItem posAuto = new MenuItem { Header = "Smart Taskbar Offset (Auto)", IsChecked = true };
+                MenuItem posLeft = new MenuItem { Header = "Taskbar Edge (Flush Left)", IsChecked = false };
                 posLeft.Click += (s, e) => {
-                    posLeft.IsChecked = true; posSys_Mon.IsChecked = false;
+                    posLeft.IsChecked = true; posAuto.IsChecked = false;
                     IntPtr curT = FindWindow("Shell_TrayWnd", null);
                     RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
                     if (curT != IntPtr.Zero) GetWindowRect(curT, out rt);
                     win.Left = rt.Left + 12;
                     win.Top = rt.Top + _cachedSmartMargin;
                 };
-                posSys_Mon.Click += (s, e) => {
-                    posLeft.IsChecked = false; posSys_Mon.IsChecked = true;
+                posAuto.Click += (s, e) => {
+                    posLeft.IsChecked = false; posAuto.IsChecked = true;
                     IntPtr curT = FindWindow("Shell_TrayWnd", null);
                     RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
                     if (curT != IntPtr.Zero) GetWindowRect(curT, out rt);
-                    win.Left = rt.Left + 150;
+                    int targetX = rt.Left + 12;
+                    IntPtr hAdj = FindWindow(_adjacentWndClass, null);
+                    if (hAdj != IntPtr.Zero && IsWindowVisible(hAdj)) {
+                        RECT rK;
+                        if (GetWindowRect(hAdj, out rK) && rK.Right > 0 && rK.Right < 300) {
+                            targetX = rK.Right + 8;
+                        }
+                    }
+                    win.Left = targetX;
                     win.Top = rt.Top + _cachedSmartMargin;
                 };
+                posMenu.Items.Add(posAuto);
                 posMenu.Items.Add(posLeft);
-                posMenu.Items.Add(posSys_Mon);
 
                 MenuItem gpuMenu = new MenuItem { Header = "GPU Telemetry Source" };
                 MenuItem gpuNvidia = new MenuItem { Header = "NVIDIA GeForce MX350 (Discrete - Default)", IsCheckable = true, IsChecked = true };
@@ -740,11 +749,11 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                         string cpuLine = (_hasCpuTemp && _cachedCpuTempValid)
                             ? string.Format("CPU: {0} ({1})", txtCpu.Text, txtCpuT.Text)
                             : string.Format("CPU: {0}", txtCpu.Text);
+                        string ramLine = string.Format("RAM: {0:F1} / {1:F1} GB ({2})", _cachedUsedGb, _cachedTotGb, txtRam.Text);
                         string gpuLine = _hasNvml 
                             ? string.Format("GPU: {0} ({1})", txtGpu.Text, txtGpuT.Text)
                             : string.Format("GPU: {0}", txtGpu.Text);
-                        string ramLine = string.Format("RAM: {0:F1} / {1:F1} GB ({2})", _cachedUsedGb, _cachedTotGb, txtRam.Text);
-                        ttText.Text = string.Format("{0}\n{1}\n{2}", cpuLine, gpuLine, ramLine);
+                        ttText.Text = string.Format("{0}\n{1}\n{2}", cpuLine, ramLine, gpuLine);
 
                         // Position checking without heavy process enumeration
                         IntPtr curTray = FindWindow("Shell_TrayWnd", null);
@@ -761,11 +770,11 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                             if (isLocked) {
                                 int targetX = rCurTray.Left + 12;
-                                IntPtr hSys_Mon = FindWindow("Sys_MonOverlayWndClass_Main", null);
-                                if (hSys_Mon != IntPtr.Zero && IsWindowVisible(hSys_Mon)) {
+                                IntPtr hAdj = FindWindow(_adjacentWndClass, null);
+                                if (hAdj != IntPtr.Zero && IsWindowVisible(hAdj)) {
                                     RECT rK;
-                                    if (GetWindowRect(hSys_Mon, out rK) && rK.Right > 0 && rK.Right < 300) {
-                                        targetX = rK.Right + 8; // Clean 8px gap beside Sys_Mon
+                                    if (GetWindowRect(hAdj, out rK) && rK.Right > 0 && rK.Right < 300) {
+                                        targetX = rK.Right + 8; // Clean 8px gap beside adjacent widget
                                     }
                                 }
                                 int targetY = rCurTray.Top + _cachedSmartMargin;

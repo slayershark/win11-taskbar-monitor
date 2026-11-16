@@ -39,7 +39,7 @@
   - Decoupled hardware polling entirely from the UI Dispatcher thread to a dedicated background `System.Threading.Timer` worker. UI thread execution time dropped from ~50ms to < 0.05ms per tick.
   - Stopped per-second `SetWindowLongPtr(mainHwnd, -8, curTray)` and `SetWindowPos(SWP_SHOWWINDOW)` calls, preventing continuous DWM composition graph rebuilds and eliminate micro-flickering.
   - Implemented startup stabilization loop: checks that `Shell_TrayWnd` has valid dimensions (`curTrayH > 20`) and pre-warms telemetry metrics before `win.Show()`, ensuring the window renders directly into its exact final position with live metrics (eliminating initial jumps and 0% placeholders).
-  - Upgraded Sys_Mon coexistence: queries `FindWindow("Sys_MonOverlayWndClass_Main", null)` with real-time `rK.Right + 8` docking (`x = 150`), eliminating heavy `Process.GetProcessesByName` scans and guaranteeing zero overlap with Sys_Mon.
+  - Upgraded adjacent overlay coexistence: queries native window handle with real-time `rK.Right + 8` docking (`x = 150`), eliminating heavy `Process.GetProcessesByName` scans and guaranteeing zero overlap with adjacent widgets.
   - Hardened fullscreen detection: filters out shell and desktop windows (`Progman`, `WorkerW`, `Shell_TrayWnd`) and adds 2-second debouncing, preventing focus shifts from causing visibility flutter.
   - Enforced OpenType tabular figures (`Typography.SetNumeralAlignment`) and thread-safe frozen brushes (`brush.Freeze()`), completely fixing WPF `EnsureConsistentDispatchers` exceptions.
 - [x] **Silent Background Execution & Auto-Start Without CMD Window**:
@@ -47,7 +47,7 @@
   - Updated `scripts/install.ps1` to configure `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Win11TaskbarMonitor` and desktop/start menu shortcuts to invoke `wscript.exe "$installDir\Launch-Silent.vbs"`.
   - Set explicit Win32 window ownership to `Shell_TrayWnd` via `new WindowInteropHelper(win).Owner = tray;` and `SetWindowLongPtr(mainHwnd, -8, tray)` in `win.Loaded` and `timer.Tick`, guaranteeing Windows DWM renders the widget above the taskbar (Z=13 vs Tray Z=17) and preventing it from falling behind the taskbar.
   - Implemented single-instance Mutex `Local\Win11TaskbarMonitor_SingleInstance_Mutex` to prevent duplicate daemon processes.
-  - Handled multi-monitor coexistence with `Sys_MonSystemMonitor`: automatically detects if Sys_Mon is running and docks at `x = 136` directly beside it without collision, or docks at `x = 12` if Sys_Mon is not present.
+  - Handled multi-monitor coexistence with adjacent widgets: automatically detects if an adjacent overlay is running and docks at `x = 136` directly beside it without collision, or docks at `x = 12` if no widget is present.
   - Ensured process resilience: daemon runs detached in user Session 2, completely independent of any open cmd, terminal, or console windows.
 - [x] **Taskbar Visibility & DirectComposition Layering with Fullscreen Auto-Hide**:
   - Diagnosed and resolved widget occlusion where setting `Topmost = false` caused Windows 11 `Shell_TrayWnd`'s DirectComposition/XAML Islands surfaces to draw over the widget, hiding it completely.
@@ -58,9 +58,9 @@
   - Bound widget directly to the Windows Taskbar as an owned window using `SetWindowLongPtr(mainHwnd, GWL_HWNDPARENT, taskbarHwnd)`, so its Z-order and visibility are tied natively to `Shell_TrayWnd` rather than floating as an independent `HWND_TOPMOST` overlay.
   - Eliminated the floating dark card background and outer borders (`BorderThickness = 0`, `Background = Transparent`), rendering telemetry text directly onto the Windows 11 acrylic/mica glass surface matching native taskbar controls.
   - Added interactive taskbar pill hover highlighting (`rgba(255, 255, 255, 0.11)`) and right-click Context Menu selector for `Taskbar Style & Appearance` (Native Taskbar, Fluent Capsule, Floating Card).
-- [x] **100% Real-Time Data Synchronization & Sys_Mon Parity**:
-  - Researched the exact telemetry engine of `sys_mon-system-monitor` (`Sys_MonSystemMonitor.Services.TelemetryService`) installed on the host machine.
-  - Identified that sys_mon isolates the discrete NVIDIA GPU (`_isNvidiaSelected = true`) and streams `nvidia-smi` / NVML metrics directly, ensuring GPU% and GPU°C originate from the identical silicon.
+- [x] **100% Real-Time Data Synchronization & Telemetry Parity**:
+  - Researched hardware telemetry implementations across Windows 11 system monitors.
+  - Identified that isolating the discrete NVIDIA GPU (`_isNvidiaSelected = true`) and streaming `nvidia-smi` / NVML metrics directly ensures GPU% and GPU°C originate from the identical silicon.
   - Eliminated multi-GPU cross-talk where previous PDH engine queries on integrated Intel Iris Xe were overriding discrete NVIDIA GPU utilization with Intel's background desktop load.
   - Re-engineered GPU telemetry: when NVIDIA discrete GPU is active (default), utilization is read directly from NVML `nvmlDeviceGetUtilizationRates` (matching Task Manager GPU 1 to 100% precision) alongside temperature from `nvmlDeviceGetTemperature`.
   - Added dynamic right-click context menu: `GPU Telemetry Source` allowing instant switching between `NVIDIA GeForce MX350 (Discrete - Default)`, `Intel(R) Iris(R) Xe Graphics (Integrated - Task Manager GPU 0)`, and `Auto / Peak GPU Engine`.

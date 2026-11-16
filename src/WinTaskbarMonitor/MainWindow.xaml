@@ -131,21 +131,6 @@
             </StackPanel>
 
             <Rectangle Style="{StaticResource SeparatorStyle}"
-                       Visibility="{Binding ShowGpu, Converter={StaticResource BoolToVis}}" />
-
-            <!-- GPU Load -->
-            <StackPanel Style="{StaticResource MetricContainerStyle}"
-                        Visibility="{Binding ShowGpu, Converter={StaticResource BoolToVis}}"
-                        ToolTip="{Binding GpuTooltip}">
-                <TextBlock Text="GPU" Style="{StaticResource MetricLabelStyle}" />
-                <TextBlock Text="{Binding GpuValue}"
-                           Foreground="{Binding GpuBrush}"
-                           Style="{StaticResource MetricValueStyle}"
-                           MinWidth="28"
-                           TextAlignment="Center" />
-            </StackPanel>
-
-            <Rectangle Style="{StaticResource SeparatorStyle}"
                        Visibility="{Binding ShowCpuTemp, Converter={StaticResource BoolToVis}}" />
 
             <!-- CPU Temp -->
@@ -155,21 +140,6 @@
                 <TextBlock Text="CPU°" Style="{StaticResource MetricLabelStyle}" />
                 <TextBlock Text="{Binding CpuTempValue}"
                            Foreground="{Binding CpuTempBrush}"
-                           Style="{StaticResource MetricValueStyle}"
-                           MinWidth="34"
-                           TextAlignment="Center" />
-            </StackPanel>
-
-            <Rectangle Style="{StaticResource SeparatorStyle}"
-                       Visibility="{Binding ShowGpuTemp, Converter={StaticResource BoolToVis}}" />
-
-            <!-- GPU Temp -->
-            <StackPanel Style="{StaticResource MetricContainerStyle}"
-                        Visibility="{Binding ShowGpuTemp, Converter={StaticResource BoolToVis}}"
-                        ToolTip="{Binding GpuTempTooltip}">
-                <TextBlock Text="GPU°" Style="{StaticResource MetricLabelStyle}" />
-                <TextBlock Text="{Binding GpuTempValue}"
-                           Foreground="{Binding GpuTempBrush}"
                            Style="{StaticResource MetricValueStyle}"
                            MinWidth="34"
                            TextAlignment="Center" />
@@ -187,6 +157,36 @@
                            Foreground="{Binding RamBrush}"
                            Style="{StaticResource MetricValueStyle}"
                            MinWidth="30"
+                           TextAlignment="Center" />
+            </StackPanel>
+
+            <Rectangle Style="{StaticResource SeparatorStyle}"
+                       Visibility="{Binding ShowGpu, Converter={StaticResource BoolToVis}}" />
+
+            <!-- GPU Load -->
+            <StackPanel Style="{StaticResource MetricContainerStyle}"
+                        Visibility="{Binding ShowGpu, Converter={StaticResource BoolToVis}}"
+                        ToolTip="{Binding GpuTooltip}">
+                <TextBlock Text="GPU" Style="{StaticResource MetricLabelStyle}" />
+                <TextBlock Text="{Binding GpuValue}"
+                           Foreground="{Binding GpuBrush}"
+                           Style="{StaticResource MetricValueStyle}"
+                           MinWidth="28"
+                           TextAlignment="Center" />
+            </StackPanel>
+
+            <Rectangle Style="{StaticResource SeparatorStyle}"
+                       Visibility="{Binding ShowGpuTemp, Converter={StaticResource BoolToVis}}" />
+
+            <!-- GPU Temp -->
+            <StackPanel Style="{StaticResource MetricContainerStyle}"
+                        Visibility="{Binding ShowGpuTemp, Converter={StaticResource BoolToVis}}"
+                        ToolTip="{Binding GpuTempTooltip}">
+                <TextBlock Text="GPU°C" Style="{StaticResource MetricLabelStyle}" />
+                <TextBlock Text="{Binding GpuTempValue}"
+                           Foreground="{Binding GpuTempBrush}"
+                           Style="{StaticResource MetricValueStyle}"
+                           MinWidth="34"
                            TextAlignment="Center" />
             </StackPanel>
         </StackPanel>

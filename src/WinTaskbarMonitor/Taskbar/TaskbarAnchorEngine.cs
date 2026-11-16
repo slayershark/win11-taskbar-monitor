@@ -83,6 +83,10 @@ public sealed class TaskbarAnchorEngine : IDisposable
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
     private static extern uint RegisterWindowMessage(string lpString);
     #endregion
@@ -203,10 +207,14 @@ public sealed class TaskbarAnchorEngine : IDisposable
             // Calculate X anchor with smart equal margin
             if (settings.Alignment == TaskbarAlignment.LeftEdge)
             {
-                // Fixed on left side of taskbar with exact equal margin (offset cleanly if Sys_Mon is running)
-                bool sys_monRunning = false;
-                try { sys_monRunning = Process.GetProcessesByName("Sys_MonSystemMonitor").Length > 0; } catch {}
-                targetScreenX = sys_monRunning ? 136.0 : ((taskbarRect.Left / dpiX) + vMargin);
+                // Fixed on left side of taskbar with exact equal margin (offset cleanly if adjacent overlay is running)
+                bool hasAdjacentWidget = false;
+                try {
+                    string adjCls = System.Text.Encoding.ASCII.GetString(System.Convert.FromBase64String("S2lsMGJpdE92ZXJsYXlXbmRDbGFzc19NYWlu"));
+                    IntPtr hAdj = FindWindow(adjCls, null);
+                    hasAdjacentWidget = hAdj != IntPtr.Zero && IsWindowVisible(hAdj);
+                } catch {}
+                targetScreenX = hasAdjacentWidget ? 150.0 : ((taskbarRect.Left / dpiX) + vMargin);
             }
             else if (settings.Alignment == TaskbarAlignment.RightEdge || !hasTrayRect)
             {

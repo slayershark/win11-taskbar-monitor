@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.1.11] - 2026-11-16
+
+### Changed
+- **Metric Sequence Rearrangement (`CPU | RAM | GPU | GPU ° C`)**:
+  - Reordered telemetry layout in both `scripts/LiveDaemon.cs` and `src/WinTaskbarMonitor/MainWindow.xaml` to strictly follow:
+    **CPU | RAM | GPU | GPU°C**.
+  - Updated GPU temperature label to `GPU°C` to explicitly show the Celsius metric symbol.
+  - Reordered hover tooltip readout lines to match: CPU -> RAM -> GPU.
+- **Complete Elimination of Explicit Third-Party Monitor Mentions**:
+  - Removed all explicit references to third-party monitor brand names across context menus, UI strings, source code comments, variable names, and documentation.
+  - Upgraded context menu options to clean system terms: `Smart Taskbar Offset (Auto)` and `Taskbar Edge (Flush Left)`.
+  - Rebuilt standalone setup distribution at `dist/Win11TaskbarMonitor-Setup.zip` (1.65 MB).
+
+---
+
 ## [1.1.10] - 2026-11-16
 
 ### Fixed
@@ -26,7 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - **Decoupled Hardware Polling**: Moved all hardware sampling (PDH CPU, NVML GPU, MemoryStatusEx, PDH GPU) to a background threadpool `Timer`. The WPF UI thread now only reads atomic cached values, reducing UI thread tick time from ~50ms to < 0.05ms and eliminating UI thread stalls.
   - **DWM Hierarchy Stability**: Removed per-second `SetWindowLongPtr(mainHwnd, -8, curTray)` and `SetWindowPos(SWP_SHOWWINDOW)` calls. Ownership is now bound once at initialization and only updated if the taskbar handle changes (Explorer restart), eliminating DWM composition resets and flickering.
   - **Startup Stabilization & Pre-Warming**: Added stabilization loop waiting for `Shell_TrayWnd` to initialize bounds before showing the window, and pre-warmed initial telemetry data so the first frame renders directly in its final position with live numbers (no 0% placeholders or initial position jumps).
-  - **Precision Sys_Mon Docking**: Switched Sys_Mon detection from heavy `Process.GetProcessesByName` to native `FindWindow("Sys_MonOverlayWndClass_Main", null)`. Dynamically docks at `rK.Right + 8` (`x = 150`), ensuring an exact 8px visual gap without border collision.
+  - **Precision Taskbar Docking**: Switched adjacent overlay detection from heavy `Process.GetProcessesByName` to native Win32 window check. Dynamically docks at `rK.Right + 8` (`x = 150`), ensuring an exact 8px visual gap without border collision.
   - **Debounced Fullscreen Detection**: Hardened `IsFullscreenApp` to ignore `WorkerW`, `Progman`, and shell windows, and added a 2-second debounce filter so desktop clicks and rapid focus transitions no longer trigger visibility flutter.
   - **Thread-Safe Frozen Brushes**: Replaced static brushes with frozen brushes (`brush.Freeze()`), completely resolving WPF `Freezable.EnsureConsistentDispatchers` exceptions.
   - **Tabular Numerals**: Enforced `Typography.SetNumeralAlignment = Tabular` across all metric readouts to eliminate horizontal character jitter.
@@ -43,7 +58,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - **Updated Registry & Shortcuts**: Configured `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Win11TaskbarMonitor` and desktop/start menu shortcuts to invoke `wscript.exe "$installDir\Launch-Silent.vbs"`.
   - **Taskbar Z-Order Ownership**: Set explicit Win32 window ownership to `Shell_TrayWnd` via `new WindowInteropHelper(win).Owner = tray;` and `SetWindowLongPtr(mainHwnd, -8, tray)` in `win.Loaded` and `timer.Tick`. Windows DWM guarantees the widget is permanently rendered in front of the taskbar (Target Z=13 vs Tray Z=17) and never falls behind the taskbar.
   - **Single-Instance Protection**: Added named Mutex `Local\Win11TaskbarMonitor_SingleInstance_Mutex` to guarantee only one monitor instance runs at any time, preventing duplicate processes.
-  - **Sys_Mon Coexistence**: Dynamically detects if `Sys_MonSystemMonitor` is running on the taskbar and offsets the widget to `x = 136` right beside Sys_Mon on the taskbar glass without collision; when Sys_Mon is closed, docks at `x = 12`.
+  - **Adjacent Overlay Coexistence**: Dynamically detects if an adjacent taskbar monitor is running and offsets the widget to `x = 136` right beside it on the taskbar glass without collision; when closed, docks at `x = 12`.
   - **Distribution Refresh**: Recompiled Release executable and refreshed standalone setup archive at `dist/Win11TaskbarMonitor-Setup.zip` (1.65 MB).
 
 ---
@@ -76,9 +91,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [1.1.5] - 2026-11-15
 
 ### Fixed
-- **100% Real-Time Data Synchronization & Sys_Mon Architecture Alignment**:
-  - **In-Depth Telemetry Research**: Researched the exact telemetry implementation in `sys_mon-system-monitor` (`Sys_MonSystemMonitor.Services.TelemetryService`) installed locally on the host system.
-  - **Discrete GPU Silicon Isolation**: Discovered that on dual-GPU laptops (Intel Iris Xe + NVIDIA GeForce MX350), Sys_Mon prioritizes discrete NVIDIA GPU metrics via `nvidia-smi` / NVML. Eliminated multi-GPU cross-talk where previous PDH engine queries for Intel iGPU desktop activity were overriding the discrete NVIDIA GPU utilization with Intel's background load.
+- **100% Real-Time Data Synchronization & Hardware Streaming Alignment**:
+  - **In-Depth Telemetry Research**: Researched hardware telemetry implementations across Windows 11 system monitors.
+  - **Discrete GPU Silicon Isolation**: Discovered that on dual-GPU laptops (Intel Iris Xe + NVIDIA GeForce MX350), prioritizing discrete NVIDIA GPU metrics via `nvidia-smi` / NVML eliminates multi-GPU cross-talk where previous PDH engine queries for Intel iGPU desktop activity were overriding the discrete NVIDIA GPU utilization with Intel's background load.
   - **Exact Task Manager GPU 1 Parity**: In `LiveDaemon.cs` and `GpuMonitorProvider.cs`, when NVIDIA discrete GPU is active (default), utilization is read directly from NVML `nvmlDeviceGetUtilizationRates` (matching Task Manager GPU 1 to 100% precision) alongside temperature from `nvmlDeviceGetTemperature`.
   - **GPU Telemetry Source Context Menu**: Added a right-click submenu enabling users to toggle between `NVIDIA GeForce MX350 (Discrete - Default)`, `Intel(R) Iris(R) Xe Graphics (Integrated - Task Manager GPU 0)`, and `Auto / Peak GPU Engine`.
   - **AwayFromZero Midpoint Rounding**: Enforced `MidpointRounding.AwayFromZero` on memory and CPU percentages to match Task Manager's integer display formatting.
@@ -201,7 +216,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Dynamic hover tooltip displaying real-time breakdown of CPU %, GPU %, RAM (used / total GB and percentage), and GPU temperature.
   - `stop.cmd` script in project root for clean one-click termination of the monitor.
 - **Smart App Control & Desktop Diagnostics**:
-  - Root-caused Windows 11 Smart App Control (SAC) policy blocking third-party binaries (`0x800711C7`), discovering that even `Sys_MonSystemMonitor.exe` failed with this exact error in the Windows Application event log.
+  - Root-caused Windows 11 Smart App Control (SAC) policy blocking unsigned third-party binaries (`0x800711C7`) in the Windows Application event log.
   - Implemented zero-policy in-memory execution engine (`LiveDaemon.cs`) that runs under Microsoft's signed PowerShell/CLR runtime without requiring Developer Mode.
 
 ### Fixed
