@@ -16,7 +16,7 @@
   1. Intel(R) Iris(R) Xe Graphics (Integrated)
   2. NVIDIA GeForce MX350 (Discrete, verified at 61°C via NVML)
 - **Runtime & SDK**: .NET 8 SDK 8.0.428 in `%LOCALAPPDATA%\dotnet`.
-- **Active Process**: PID 21668 (`Win11TaskbarMonitor.exe` standalone native process).
+- **Active Process**: PID 22604 (`Win11TaskbarMonitor.exe` standalone native process, 32.7 MB working set).
 - **Git Repository**: Initialized locally in `d:\WinTaskbarMonitor`.
   - Identity configured at repo level:
     - `user.name`: `slayershark`

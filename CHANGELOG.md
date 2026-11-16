@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.2.1] - 2026-11-16
+
+### Changed
+- **Comprehensive Cleanup & Cache Purge**:
+  - Purged intermediate `obj/` and `bin/` compiler cache trees across `src/` and `tests/` (including legacy WPF temporary markup assemblies `wpftmp`).
+  - Cleaned obsolete distribution directories (`dist/self-contained`, `dist/Win11TaskbarMonitor-Standalone`) and loose `.dll`/`.pdb` binaries, reclaiming disk space and standardizing on `dist/Win11TaskbarMonitor-App`.
+  - Removed deprecated temporary capture scripts (`scripts/capture_full.ps1`).
+  - Added robust process exit waiting (`WaitForExit`) in `scripts/install.ps1` to prevent file lock contention during reinstalls.
+  - Rebuilt clean distribution setup package at `dist/Win11TaskbarMonitor-Setup.zip` (2.26 MB).
+
+---
+
 ## [1.2.0] - 2026-11-16
 
 ### Added
