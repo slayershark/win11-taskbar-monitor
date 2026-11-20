@@ -4,7 +4,7 @@
 
 **Project**: Win11TaskbarMonitor  
 **Objective**: Build a lightweight, native, and highly reliable Windows 11 taskbar hardware telemetry utility (CPU, GPU, CPU Temp, GPU Temp, RAM) without bloat, web dependencies, or excessive resource overhead.  
-**Current Milestone**: Migrated to standalone native Windows executable (`Win11TaskbarMonitor.exe`). Application runs independently with zero PowerShell or CMD dependency, sequence arranged as `CPU | RAM | GPU | GPU°C`, zero third-party references, top-popping hover tooltip, and packaged into universal release zip (`dist/Win11TaskbarMonitor-Setup.zip`). Installed onto the host system at `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor`.
+**Current Milestone**: Set GPU Telemetry Source to Auto by default across all GPUs (Intel Iris Xe + NVIDIA MX350 peak engine tracking with NVML thermals). Application runs independently with zero PowerShell or CMD dependency, sequence arranged as `CPU | RAM | GPU | GPU°C`, zero third-party references, top-popping hover tooltip, and packaged into universal release zip (`dist/Win11TaskbarMonitor-Setup.zip`). Installed onto the host system at `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor`.
 
 ---
 
@@ -14,9 +14,9 @@
 - **CPU**: 11th Gen Intel(R) Core(TM) i5-1135G7 (4 cores, 8 threads)
 - **GPUs Detected & Monitored**:
   1. Intel(R) Iris(R) Xe Graphics (Integrated)
-  2. NVIDIA GeForce MX350 (Discrete, verified at 61°C via NVML)
+  2. NVIDIA GeForce MX350 (Discrete, verified via NVML)
 - **Runtime & SDK**: .NET 8 SDK 8.0.428 in `%LOCALAPPDATA%\dotnet`.
-- **Active Process**: PID 22604 (`Win11TaskbarMonitor.exe` standalone native process, 32.7 MB working set).
+- **Active Process**: PID 15936 (`Win11TaskbarMonitor.exe` standalone native process, ~24 MB working set).
 - **Git Repository**: Initialized locally in `d:\WinTaskbarMonitor`.
   - Identity configured at repo level:
     - `user.name`: `slayershark`
@@ -27,6 +27,11 @@
 
 ## 3. Completed Features
 
+- [x] **Default GPU Telemetry Source Set to Auto Across All GPUs**:
+  - Configured default GPU telemetry mode to Auto (`_gpuMode = 2`) across native monitor implementations (`src/NativeMonitor/Program.cs` and `scripts/LiveDaemon.cs`).
+  - Automatically captures peak utilization across integrated Intel Iris Xe and discrete NVIDIA GeForce MX350, with direct NVML thermal streaming.
+  - Reorganized the context menu to feature `Auto (All GPUs - Default)` as the top option, checked by default (`IsChecked = true`).
+  - Verified 18/18 unit tests and 10/10 automated QA & smoke tests passed with active live desktop capture.
 - [x] **Native Executable Architecture (Zero PowerShell/CMD Dependency)**:
   - Migrated entire application from PowerShell/WScript runner to compiled native Windows executable `Win11TaskbarMonitor.exe` (`src/NativeMonitor`).
   - Native STAThread entry point with thread-safe background polling worker, decoupled `Win32_Process` creation, and `Local\Win11TaskbarMonitor_Native_Mutex_v2`.

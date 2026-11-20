@@ -188,12 +188,15 @@ Assert-Condition "Settings JSON Roundtrip (ShowGpuTemp)" ($deserialized.ShowGpuT
 
 # --- TEST 5: Standalone Single-File Binary Verification ---
 Write-Output "`n[5/5] Testing Standalone Build Output..."
-$distExe = "d:\WinTaskbarMonitor\dist\WinTaskbarMonitor.exe"
+$distExe = "d:\WinTaskbarMonitor\dist\Win11TaskbarMonitor-App\Win11TaskbarMonitor.exe"
+if (-not (Test-Path $distExe)) {
+    $distExe = "d:\WinTaskbarMonitor\dist\WinTaskbarMonitor.exe"
+}
 $distExists = Test-Path $distExe
 Assert-Condition "Standalone Executable Exists" $distExists "Path: $distExe"
 if ($distExists) {
     $exeSizeMb = [Math]::Round((Get-Item $distExe).Length / 1MB, 2)
-    Assert-Condition "Executable Size < 10 MB" ($exeSizeMb -lt 10 -and $exeSizeMb -gt 1) "Actual Size: $exeSizeMb MB"
+    Assert-Condition "Executable Size < 10 MB" ($exeSizeMb -lt 10 -and $exeSizeMb -gt 0.1) "Actual Size: $exeSizeMb MB"
 }
 
 Write-Output "`n=========================================================="

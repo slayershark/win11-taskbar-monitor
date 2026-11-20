@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.2.2] - 2026-11-20
+
+### Changed
+- **Default GPU Telemetry Stream Mode Set to Auto**:
+  - Configured default GPU telemetry mode to Auto (`_gpuMode = 2`) across native monitor implementations (`src/NativeMonitor/Program.cs` and `scripts/LiveDaemon.cs`).
+  - Workload across both integrated (Intel Iris Xe) and discrete (NVIDIA GeForce MX350) graphics processors is now dynamically tracked out-of-the-box via peak engine metrics with hardware thermals from NVML.
+  - Reorganized the right-click Context Menu under `GPU Telemetry Source` to display `Auto (All GPUs - Default)` as the top option, checked by default (`IsChecked = true`).
+  - Rebuilt and published native binary (`Win11TaskbarMonitor.exe`), reinstalled to `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor`, and updated universal distribution package (`dist/Win11TaskbarMonitor-Setup.zip`).
+  - Verified 18/18 unit tests passed and 10/10 automated QA & smoke tests passed with active live desktop capture.
+
+---
+
 ## [1.2.1] - 2026-11-16
 
 ### Changed

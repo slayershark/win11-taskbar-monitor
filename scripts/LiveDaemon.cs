@@ -147,7 +147,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         private static IntPtr _hCpuCounter = IntPtr.Zero;
         private static IntPtr _hGpuCounter = IntPtr.Zero;
         private static bool _hasPdh = false;
-        private static int _gpuMode = 0; // 0 = Dedicated/NVIDIA, 1 = Integrated/Intel, 2 = Peak Load
+        private static int _gpuMode = 2; // 2 = Auto / All GPUs (Default), 0 = Dedicated/NVIDIA, 1 = Integrated/Intel
         private static readonly string _adjacentWndClass = Encoding.ASCII.GetString(Convert.FromBase64String("S2lsMGJpdE92ZXJsYXlXbmRDbGFzc19NYWlu"));
         private static int _styleMode = 0; // 0 = Native Taskbar, 1 = Fluent Capsule, 2 = Floating Card
         private static Mutex _singleInstanceMutex = null;
@@ -647,25 +647,25 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 posMenu.Items.Add(posLeft);
 
                 MenuItem gpuMenu = new MenuItem { Header = "GPU Telemetry Source" };
-                MenuItem gpuNvidia = new MenuItem { Header = "NVIDIA GeForce MX350 (Discrete - Default)", IsCheckable = true, IsChecked = true };
+                MenuItem gpuAuto = new MenuItem { Header = "Auto (All GPUs - Default)", IsCheckable = true, IsChecked = true };
+                MenuItem gpuNvidia = new MenuItem { Header = "NVIDIA GeForce MX350 (Discrete)", IsCheckable = true, IsChecked = false };
                 MenuItem gpuIntel = new MenuItem { Header = "Intel(R) Iris(R) Xe Graphics (Integrated - GPU 0)", IsCheckable = true, IsChecked = false };
-                MenuItem gpuPeak = new MenuItem { Header = "Auto / Peak GPU Engine", IsCheckable = true, IsChecked = false };
 
+                gpuAuto.Click += (s, e) => {
+                    _gpuMode = 2;
+                    gpuAuto.IsChecked = true; gpuNvidia.IsChecked = false; gpuIntel.IsChecked = false;
+                };
                 gpuNvidia.Click += (s, e) => {
                     _gpuMode = 0;
-                    gpuNvidia.IsChecked = true; gpuIntel.IsChecked = false; gpuPeak.IsChecked = false;
+                    gpuAuto.IsChecked = false; gpuNvidia.IsChecked = true; gpuIntel.IsChecked = false;
                 };
                 gpuIntel.Click += (s, e) => {
                     _gpuMode = 1;
-                    gpuNvidia.IsChecked = false; gpuIntel.IsChecked = true; gpuPeak.IsChecked = false;
+                    gpuAuto.IsChecked = false; gpuNvidia.IsChecked = false; gpuIntel.IsChecked = true;
                 };
-                gpuPeak.Click += (s, e) => {
-                    _gpuMode = 2;
-                    gpuNvidia.IsChecked = false; gpuIntel.IsChecked = false; gpuPeak.IsChecked = true;
-                };
+                gpuMenu.Items.Add(gpuAuto);
                 gpuMenu.Items.Add(gpuNvidia);
                 gpuMenu.Items.Add(gpuIntel);
-                gpuMenu.Items.Add(gpuPeak);
 
                 MenuItem itemReset = new MenuItem { Header = "Recalculate Equal Margins" };
                 itemReset.Click += (s, e) => {
