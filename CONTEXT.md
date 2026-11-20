@@ -17,11 +17,12 @@
   2. NVIDIA GeForce MX350 (Discrete, verified via NVML)
 - **Runtime & SDK**: .NET 8 SDK 8.0.428 in `%LOCALAPPDATA%\dotnet`.
 - **Active Process**: PID 15936 (`Win11TaskbarMonitor.exe` standalone native process, ~24 MB working set).
-- **Git Repository**: Initialized locally in `d:\WinTaskbarMonitor`.
+- **Git Repository**: Initialized and published to GitHub.
+  - Remote: `https://github.com/slayershark/win11-taskbar-monitor.git` (`origin/master`)
   - Identity configured at repo level:
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
-  - Current Branch: `master`
+  - Current Branch: `master` (tracking `origin/master`)
 
 ---
 
