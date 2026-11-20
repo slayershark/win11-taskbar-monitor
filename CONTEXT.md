@@ -19,6 +19,8 @@
 - **Active Process**: PID 15936 (`Win11TaskbarMonitor.exe` standalone native process, ~24 MB working set).
 - **Git Repository**: Initialized and published to GitHub.
   - Remote: `https://github.com/slayershark/win11-taskbar-monitor.git` (`origin/master`)
+  - Latest Tag: `v1.2.2` (pushed to origin)
+  - GitHub Actions: Automated CI (`ci.yml`) and Release Packaging (`release.yml`) active
   - Identity configured at repo level:
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
