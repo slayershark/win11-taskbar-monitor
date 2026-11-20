@@ -1,0 +1,184 @@
+<Window x:Class="Win11TaskbarMonitor.Installer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Win11TaskbarMonitor Setup"
+        Width="580" Height="470"
+        MinWidth="580" MinHeight="470"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="{StaticResource BgBrush}"
+        Icon="app.ico">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="64" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="56" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#242424" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <Grid Margin="16,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="42" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Image Grid.Column="0" Source="app.ico" Width="32" Height="32" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
+                    <TextBlock x:Name="TxtHeaderTitle" Text="Win11TaskbarMonitor Setup" FontSize="14.5" FontWeight="SemiBold" />
+                    <TextBlock x:Name="TxtHeaderSub" Text="Version 1.2.2 • Ultra-lightweight Windows 11 Taskbar Monitor" FontSize="11.5" Foreground="{StaticResource TextSecondary}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Body Panels -->
+        <Grid Grid.Row="1" Margin="24,18">
+
+            <!-- Panel 0: Welcome -->
+            <Grid x:Name="PanelWelcome" Visibility="Visible">
+                <StackPanel VerticalAlignment="Top">
+                    <TextBlock Text="Welcome to Win11TaskbarMonitor Setup" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+                    <TextBlock Text="This setup wizard will install Win11TaskbarMonitor onto your computer. The utility docks directly alongside the Windows 11 taskbar to display real-time hardware telemetry with zero bloat and near-zero CPU footprint."
+                               TextWrapping="Wrap" LineHeight="20" Foreground="#CCCCCC" Margin="0,0,0,16" />
+
+                    <Border Background="#252525" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="14,12" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="Key Features &amp; Architecture:" FontWeight="SemiBold" FontSize="12.5" Margin="0,0,0,6" />
+                            <TextBlock Text="• Sequence: CPU | RAM | GPU | GPU°C with tabular figures" Foreground="#BBBBBB" FontSize="12" Margin="0,2" />
+                            <TextBlock Text="• Auto GPU Telemetry: Dynamic peak tracking across Intel and NVIDIA GPUs" Foreground="#BBBBBB" FontSize="12" Margin="0,2" />
+                            <TextBlock Text="• Top-popping Fluent hover tooltip with detailed hardware breakdown" Foreground="#BBBBBB" FontSize="12" Margin="0,2" />
+                            <TextBlock Text="• Native Standalone Executable: Zero PowerShell or CMD window dependency" Foreground="#BBBBBB" FontSize="12" Margin="0,2" />
+                            <TextBlock Text="• Resource Friendly: &lt; 0.5% CPU overhead, &lt; 35 MB RAM footprint" Foreground="#BBBBBB" FontSize="12" Margin="0,2" />
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="Click Next to customize installation preferences and destination folder." Foreground="{StaticResource TextSecondary}" FontSize="12" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Panel 1: Destination & User Preferences -->
+            <Grid x:Name="PanelPreferences" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel VerticalAlignment="Top">
+                        <TextBlock Text="Installation Options &amp; Preferences" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10" />
+
+                        <!-- Destination Folder -->
+                        <TextBlock Text="Install Destination Folder:" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,4" />
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="80" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="TxtInstallPath" Grid.Column="0" Height="30" VerticalContentAlignment="Center" />
+                            <Button x:Name="BtnBrowse" Grid.Column="1" Content="Browse..." Margin="8,0,0,0" Height="30" Click="BtnBrowse_Click" />
+                        </Grid>
+
+                        <!-- Shortcuts & Startup Options -->
+                        <TextBlock Text="Shortcuts &amp; Startup:" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,4" />
+                        <Border Background="#252525" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,0,0,14">
+                            <StackPanel>
+                                <CheckBox x:Name="ChkDesktopShortcut" Content="Create a Desktop shortcut" IsChecked="True" />
+                                <CheckBox x:Name="ChkStartMenuShortcut" Content="Create a Start Menu shortcut" IsChecked="True" />
+                                <CheckBox x:Name="ChkStartWithWindows" Content="Start Win11TaskbarMonitor automatically on Windows login" IsChecked="True" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Hardware Telemetry Preferences -->
+                        <TextBlock Text="Default Telemetry Configuration:" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,4" />
+                        <Border Background="#252525" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12,8">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="GPU Telemetry Source:" VerticalAlignment="Center" FontSize="12" Margin="0,4" />
+                                <ComboBox x:Name="CmbGpuMode" Grid.Row="0" Grid.Column="1" Height="26" Margin="0,4" SelectedIndex="0">
+                                    <ComboBoxItem Content="Auto (All GPUs - Recommended Default)" />
+                                    <ComboBoxItem Content="Discrete NVIDIA GPU (NVML Hardware Streaming)" />
+                                    <ComboBoxItem Content="Integrated Intel Iris Xe Graphics" />
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Temperature Unit:" VerticalAlignment="Center" FontSize="12" Margin="0,4" />
+                                <ComboBox x:Name="CmbTempUnit" Grid.Row="1" Grid.Column="1" Height="26" Margin="0,4" SelectedIndex="0">
+                                    <ComboBoxItem Content="Celsius (°C - Default)" />
+                                    <ComboBoxItem Content="Fahrenheit (°F)" />
+                                </ComboBox>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- Panel 2: Installing Progress -->
+            <Grid x:Name="PanelProgress" Visibility="Collapsed">
+                <StackPanel VerticalAlignment="Center" Margin="10,0">
+                    <TextBlock x:Name="TxtProgressTitle" Text="Installing Win11TaskbarMonitor..." FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8" />
+                    <TextBlock x:Name="TxtProgressStatus" Text="Extracting application files..." Foreground="{StaticResource TextSecondary}" FontSize="12.5" Margin="0,0,0,14" />
+                    <ProgressBar x:Name="PrgProgress" Height="8" Minimum="0" Maximum="100" Value="10" Foreground="{StaticResource AccentBrush}" Background="#2B2B2B" BorderThickness="0" Margin="0,0,0,16" />
+                    <Border Background="#252525" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                        <ScrollViewer Height="110" VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="TxtProgressLog" FontFamily="Consolas, monospace" FontSize="11" Foreground="#999999" TextWrapping="Wrap" />
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </Grid>
+
+            <!-- Panel 3: Installation Complete -->
+            <Grid x:Name="PanelFinished" Visibility="Collapsed">
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Win11TaskbarMonitor Installed Successfully!" FontSize="18" FontWeight="SemiBold" Foreground="#4EBA6F" Margin="0,0,0,10" />
+                    <TextBlock Text="Setup has finished installing Win11TaskbarMonitor on your computer." LineHeight="20" Foreground="#DDDDDD" FontSize="13" Margin="0,0,0,14" />
+
+                    <Border Background="#252525" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="14,12" Margin="0,0,0,18">
+                        <StackPanel>
+                            <TextBlock Text="Installation Summary:" FontWeight="SemiBold" FontSize="12.5" Margin="0,0,0,6" />
+                            <TextBlock x:Name="TxtSummaryDest" Text="Destination: C:\Users\..." Foreground="#AAAAAA" FontSize="12" Margin="0,2" />
+                            <TextBlock Text="Shortcuts: Desktop &amp; Start Menu created" Foreground="#AAAAAA" FontSize="12" Margin="0,2" />
+                            <TextBlock Text="Windows App: Registered in Windows Settings > Installed Apps" Foreground="#AAAAAA" FontSize="12" Margin="0,2" />
+                            <TextBlock Text="Runtime: Standalone native execution (no CMD or terminal dependencies)" Foreground="#AAAAAA" FontSize="12" Margin="0,2" />
+                        </StackPanel>
+                    </Border>
+
+                    <CheckBox x:Name="ChkLaunchNow" Content="Launch Win11TaskbarMonitor now" IsChecked="True" FontSize="13.5" FontWeight="SemiBold" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Panel 4: Uninstallation -->
+            <Grid x:Name="PanelUninstall" Visibility="Collapsed">
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Uninstall Win11TaskbarMonitor" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" />
+                    <TextBlock Text="Are you sure you want to completely remove Win11TaskbarMonitor and all of its components from your computer?"
+                               TextWrapping="Wrap" LineHeight="20" Foreground="#DDDDDD" FontSize="13" Margin="0,0,0,16" />
+
+                    <Border Background="#252525" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="14,12" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="The following actions will be performed:" FontWeight="SemiBold" FontSize="12.5" Margin="0,0,0,6" />
+                            <TextBlock Text="• Stop any running instance of the taskbar monitor" Foreground="#AAAAAA" FontSize="12" Margin="0,2" />
+                            <TextBlock Text="• Delete Desktop and Start Menu shortcuts" Foreground="#AAAAAA" FontSize="12" Margin="0,2" />
+                            <TextBlock Text="• Remove Windows startup registry autostart entry" Foreground="#AAAAAA" FontSize="12" Margin="0,2" />
+                            <TextBlock Text="• Unregister from Windows Installed Apps" Foreground="#AAAAAA" FontSize="12" Margin="0,2" />
+                            <TextBlock Text="• Remove installed program binaries and libraries" Foreground="#AAAAAA" FontSize="12" Margin="0,2" />
+                        </StackPanel>
+                    </Border>
+
+                    <CheckBox x:Name="ChkRemoveSettings" Content="Also remove configuration settings in AppData" IsChecked="True" Margin="0,0,0,14" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- Navigation Footer -->
+        <Border Grid.Row="2" Background="#242424" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+            <Grid Margin="16,0">
+                <Button x:Name="BtnCancel" Content="Cancel" HorizontalAlignment="Left" VerticalAlignment="Center" Width="80" Click="BtnCancel_Click" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button x:Name="BtnBack" Content="&lt; Back" Width="80" Margin="0,0,8,0" Click="BtnBack_Click" Visibility="Collapsed" />
+                    <Button x:Name="BtnNext" Content="Next &gt;" Style="{StaticResource AccentButtonStyle}" Width="90" Click="BtnNext_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

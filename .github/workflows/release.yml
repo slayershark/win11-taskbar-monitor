@@ -24,7 +24,20 @@ jobs:
         run: |
           dotnet publish src/NativeMonitor/NativeMonitor.csproj -c Release -r win-x64 --self-contained false -o dist/Win11TaskbarMonitor-App
 
-      - name: Build Release Package
+      - name: Package Installer Payload and Build Setup Executable
+        shell: pwsh
+        run: |
+          $tempPayload = "$env:TEMP\Win11TaskbarMonitor_Payload"
+          if (Test-Path $tempPayload) { Remove-Item -Path $tempPayload -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $tempPayload | Out-Null
+          Copy-Item "dist\Win11TaskbarMonitor-App\*" "$tempPayload" -Recurse -Force
+          Copy-Item "assets\app.ico" "$tempPayload\app.ico" -Force
+          Compress-Archive -Path "$tempPayload\*" -DestinationPath "src\Installer\payload.zip" -Force
+          Remove-Item -Path $tempPayload -Recurse -Force
+          dotnet publish src/Installer/Installer.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist/installer
+          Copy-Item "dist/installer/Win11TaskbarMonitor-Setup.exe" "dist/Win11TaskbarMonitor-Setup.exe" -Force
+
+      - name: Build Release Zip Package
         shell: pwsh
         run: |
           ./scripts/Build-ReleasePackage.ps1
@@ -33,6 +46,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            dist/Win11TaskbarMonitor-Setup.exe
             dist/Win11TaskbarMonitor-Setup.zip
           draft: false
           prerelease: false

@@ -32,3 +32,4 @@ packages/
 *.nupkg
 TestResults/
 .local/
+src/Installer/payload.zip

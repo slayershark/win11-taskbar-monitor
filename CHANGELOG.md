@@ -5,6 +5,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.3.0] - 2026-11-20
+
+### Added
+- **Native Windows 11 Fluent Graphical Setup Wizard (`Win11TaskbarMonitor-Setup.exe`)**:
+  - Engineered standalone, self-extracting single-file GUI installer application (`src/Installer`) built on .NET 8 WPF with Windows 11 Fluent dark styling.
+  - Interactive multi-step wizard:
+    - **Welcome Screen**: Clean presentation with architectural overview, feature list, and MIT licensing notice.
+    - **User Preferences**: Interactive folder selection (`OpenFolderDialog` browsing, defaults to user-space `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor` with zero UAC elevation required).
+    - **Customizable Options**: Checkboxes for Desktop shortcut, Start Menu shortcut, and Windows login autostart (`HKCU\...\Run`).
+    - **Hardware Configuration**: User can choose initial GPU mode (Auto / NVIDIA / Intel) and Temperature unit (°C / °F), automatically persisted into `settings.json`.
+    - **Installation Feedback**: Live progress bar with real-time step log showing process shutdown, payload unpacking, shortcut generation, and registry registration.
+    - **Completion Screen**: Summary banner with one-click option to launch the monitor immediately.
+  - **Integrated GUI Uninstaller (`Uninstall.exe`)**:
+    - Embedded inside the installation directory, registered in Windows **Settings > Apps > Installed apps**.
+    - Displays confirmation dialog with optional checkbox to purge configuration settings, terminates running processes, cleans up shortcuts/registry keys, and safely deletes program files.
+  - **CI/CD Automated Release Pipeline**: Updated `.github/workflows/release.yml` to package both `Win11TaskbarMonitor-Setup.exe` and `Win11TaskbarMonitor-Setup.zip` on every release tag.
+
+---
+
 ## [1.2.2] - 2026-11-20
 
 ### Changed

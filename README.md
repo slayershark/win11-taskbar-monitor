@@ -47,21 +47,23 @@ This project follows a strict **Documentation-First Workflow**:
 
 ## Installation & Removal
 
-### Quick Install (One-Click)
-- **Option 1**: Double-click [install.cmd](install.cmd) in the project root.
-- **Option 2**: Run PowerShell:
-  ```powershell
-  .\scripts\install.ps1 -CreateDesktopShortcut -StartWithWindows
-  ```
+### Graphical Setup Wizard (Recommended)
+1. Download **`Win11TaskbarMonitor-Setup.exe`** from [Releases](https://github.com/slayershark/win11-taskbar-monitor/releases).
+2. Double-click to launch the Windows 11 Fluent Setup Wizard.
+3. Configure your preferences:
+   * **Custom Destination Folder** (defaults to user-space `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor` with zero UAC elevation required).
+   * **Shortcuts**: Optional Desktop and Start Menu shortcuts.
+   * **Startup**: Toggle automatic launch on Windows login.
+   * **Hardware Preferences**: Choose default GPU telemetry source (Auto / NVIDIA / Intel) and temperature unit (°C / °F).
+4. Watch real-time extraction progress and click **Finish** to immediately enjoy the taskbar monitor.
 
-This cleanly installs Win11TaskbarMonitor to `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor`, creates a Windows Start Menu shortcut, and registers the application in Windows **Installed Apps / Add or Remove Programs**.
+### Portable / Script-Based Install
+- **Portable ZIP**: Download `Win11TaskbarMonitor-Setup.zip`, extract, and double-click `Run-Portable.cmd` (or `Win11TaskbarMonitor.exe`).
+- **1-Click Script**: Double-click `Install.cmd` in the extracted package.
 
 ### Uninstallation
-- **Via Windows Settings**: Open Windows **Settings > Apps > Installed apps**, search for **Win11TaskbarMonitor**, and click **Uninstall**.
-- **Via Script**: Double-click [uninstall.cmd](uninstall.cmd) or run:
-  ```powershell
-  .\scripts\uninstall.ps1
-  ```
+- **Via Windows Settings**: Open Windows **Settings > Apps > Installed apps**, search for **Win11TaskbarMonitor**, and click **Uninstall**. The dedicated uninstaller window will launch with an option to purge configuration settings.
+- **Via Uninstaller Binary**: Run `Uninstall.exe` located in the application directory.
 
 ---
 

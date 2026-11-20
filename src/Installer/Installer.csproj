@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>..\..\assets\app.ico</ApplicationIcon>
+    <AssemblyName>Win11TaskbarMonitor-Setup</AssemblyName>
+    <RootNamespace>Win11TaskbarMonitor.Installer</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="payload.zip" Condition="Exists('payload.zip')" />
+    <Resource Include="..\..\assets\app.ico">
+      <Link>app.ico</Link>
+    </Resource>
+  </ItemGroup>
+
+</Project>
