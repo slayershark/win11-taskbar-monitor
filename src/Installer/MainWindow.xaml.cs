@@ -361,7 +361,7 @@ namespace Win11TaskbarMonitor.Installer
                         if (uninstKey != null)
                         {
                             uninstKey.SetValue("DisplayName", "Win11TaskbarMonitor");
-                            uninstKey.SetValue("DisplayVersion", "1.2.2");
+                            uninstKey.SetValue("DisplayVersion", "1.3.0");
                             uninstKey.SetValue("Publisher", "slayershark");
                             uninstKey.SetValue("InstallLocation", installDir);
                             uninstKey.SetValue("DisplayIcon", $"{iconPath},0");
