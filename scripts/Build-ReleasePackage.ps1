@@ -66,7 +66,7 @@ $runCmd = @"
 setlocal
 cd /d "%~dp0"
 title Win11TaskbarMonitor
-start "" wscript.exe "%~dp0Launch-Silent.vbs"
+start "" "%~dp0Win11TaskbarMonitor.exe"
 "@
 Set-Content -Path "$packageDir\Run-Portable.cmd" -Value $runCmd -Encoding ASCII
 
@@ -93,10 +93,11 @@ A lightweight, native Windows 11 hardware monitoring utility anchored
 directly on the left side of your taskbar with pixel-perfect equal margins.
 
 FEATURES:
-  * Real-time CPU, GPU, GPU Temp, and RAM telemetry
-  * Smart Auto-Detection: reveals CPU Temp on supported devices,
-    collapses cleanly on unprivileged devices (never displays N/A)
-  * Smart Margin Engine: dynamic equal margins on top, bottom, and left
+  * Sequence: CPU | RAM | GPU | GPU°C
+  * Auto GPU Telemetry: dynamically monitors integrated (Intel Iris Xe)
+    and discrete (NVIDIA) GPUs via peak engine metrics and NVML thermals
+  * Top-popping Fluent hover tooltip with detailed hardware breakdown
+  * Native Standalone Executable: zero PowerShell/CMD window dependency
   * Zero-overhead: < 0.5% CPU, < 40 MB RAM
   * Zero bloat: no Electron, no Chromium, no cloud telemetry
   * Smart App Control safe: runs without Developer Mode or security blocks
