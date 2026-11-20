@@ -163,7 +163,8 @@ if ($gpuCount -gt 0) {
 
 # --- TEST 4: Settings Persistence & JSON Serialization ---
 Write-Output "`n[4/5] Testing Settings & Serialization (AppSettings)..."
-$settingsSource = Get-Content "d:\WinTaskbarMonitor\src\WinTaskbarMonitor\Config\AppSettings.cs" -Raw
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$settingsSource = Get-Content (Join-Path $repoRoot "src\WinTaskbarMonitor\Config\AppSettings.cs") -Raw
 Assert-Condition "AppSettings Class Present" (![string]::IsNullOrWhiteSpace($settingsSource)) "Source file exists"
 
 # JSON serialization roundtrip
@@ -188,9 +189,9 @@ Assert-Condition "Settings JSON Roundtrip (ShowGpuTemp)" ($deserialized.ShowGpuT
 
 # --- TEST 5: Standalone Single-File Binary Verification ---
 Write-Output "`n[5/5] Testing Standalone Build Output..."
-$distExe = "d:\WinTaskbarMonitor\dist\Win11TaskbarMonitor-App\Win11TaskbarMonitor.exe"
+$distExe = Join-Path $repoRoot "dist\Win11TaskbarMonitor-App\Win11TaskbarMonitor.exe"
 if (-not (Test-Path $distExe)) {
-    $distExe = "d:\WinTaskbarMonitor\dist\WinTaskbarMonitor.exe"
+    $distExe = Join-Path $repoRoot "dist\Win11TaskbarMonitor.exe"
 }
 $distExists = Test-Path $distExe
 Assert-Condition "Standalone Executable Exists" $distExists "Path: $distExe"

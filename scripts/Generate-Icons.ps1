@@ -160,8 +160,9 @@ public class IconGenerator {
 
 Add-Type -TypeDefinition $generatorCode -ReferencedAssemblies System.Drawing
 
-$pngDir = "d:\WinTaskbarMonitor\assets\png"
-$icoPath = "d:\WinTaskbarMonitor\assets\app.ico"
-$resDir = "d:\WinTaskbarMonitor\src\WinTaskbarMonitor\Resources"
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$pngDir = Join-Path $repoRoot "assets\png"
+$icoPath = Join-Path $repoRoot "assets\app.ico"
+$resDir = Join-Path $repoRoot "src\WinTaskbarMonitor\Resources"
 
 [IconGenerator]::GenerateAll($pngDir, $icoPath, $resDir)
