@@ -361,7 +361,7 @@ namespace Win11TaskbarMonitor.Installer
                         if (uninstKey != null)
                         {
                             uninstKey.SetValue("DisplayName", "Win11TaskbarMonitor");
-                            uninstKey.SetValue("DisplayVersion", "1.3.0");
+                            uninstKey.SetValue("DisplayVersion", "1.3.1");
                             uninstKey.SetValue("Publisher", "slayershark");
                             uninstKey.SetValue("InstallLocation", installDir);
                             uninstKey.SetValue("DisplayIcon", $"{iconPath},0");
@@ -392,10 +392,14 @@ namespace Win11TaskbarMonitor.Installer
                         ShowRam = true,
                         TemperatureUnit = tempUnit,
                         ThemeMode = "System",
-                        Alignment = "LeftOfTray",
-                        FontSize = 11.0,
+                        Alignment = "Auto",
+                        FontSize = 11.5,
                         CompactMode = false,
-                        SelectedGpuIndex = selectedGpu
+                        SelectedGpuIndex = selectedGpu,
+                        IsLocked = true,
+                        CustomX = 0,
+                        CustomY = 0,
+                        StyleMode = 0
                     };
 
                     string json = JsonSerializer.Serialize(initialSettings, new JsonSerializerOptions { WriteIndented = true });

@@ -5,6 +5,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.3.1] - 2026-11-24
+
+### Fixed
+- **Lock Position Snapping-Back Bug**:
+  - Resolved issue where manually unlocking and dragging the monitor widget snapped back to the default taskbar left offset (`rt.Left + 12`) upon re-checking "Lock Position".
+  - Refactored `_isLocked` and drag handlers in `src/NativeMonitor/Program.cs` and `scripts/LiveDaemon.cs`:
+    - Locking position now freezes and preserves the widget's current custom coordinates (`_customX`, `_customY`), preventing unwanted repositioning or reset during 1-second timer ticks.
+    - Releasing mouse after dragging (`MouseLeftButtonUp`) automatically transitions alignment to `Custom Position (Draggable)` and commits coordinates directly to `%APPDATA%\Win11TaskbarMonitor\settings.json`.
+- **Low Resolution and Custom Taskbar Overflow**:
+  - Implemented responsive vertical sizing (`applySizing`):
+    - Automatically detects taskbar height variations (e.g. 28px-34px in custom taskbars like StartAllBack/RetroBar, Windows small taskbar, or low-resolution laptops like 1366x768).
+    - Dynamically scales font sizes (8.5pt/9.5pt), item margins, padding (4,1,4,1), and separator heights (12px) when taskbar height <= 34px, dropping widget height from ~34px down to ~22-24px with zero vertical overflow.
+    - Supports medium taskbars (35px-40px) at ~28px widget height, and standard 48px taskbars at ~34px height.
+  - Implemented strict multi-boundary clamping (`setClampedPosition`):
+    - Clamps widget coordinates horizontally and vertically against both screen boundaries (`SystemParameters.PrimaryScreenWidth`, `SystemParameters.PrimaryScreenHeight`) and taskbar rectangles.
+  - Added "Compact Mode (Low Res / Small Taskbars)" toggle option in the right-click context menu and persisted in `settings.json`.
+  - Added new alignment options under `Taskbar Alignment`:
+    - `Smart Taskbar Offset (Auto)`: Standard dynamic taskbar offset.
+    - `Taskbar Edge (Flush Left)`: Left taskbar edge docking.
+    - `Left of System Tray`: Automatically anchors to the empty space directly preceding `TrayNotifyWnd` (notification chevron, clock, network, and battery icons).
+    - `Custom Position (Draggable)`: Retains user-defined coordinates across restarts.
+- **Settings Persistence**:
+  - Fully integrated `settings.json` reading and writing into `NativeMonitor` and `LiveDaemon`, synchronizing user preferences across sessions and the graphical installer.
+
+---
+
 ## [1.3.0] - 2026-11-20
 
 ### Added

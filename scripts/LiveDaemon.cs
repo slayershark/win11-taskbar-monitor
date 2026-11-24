@@ -1,7 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
+using System.Text.Json;
 using System.Threading;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -30,6 +32,9 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr FindWindowEx(IntPtr parentHandle, IntPtr childAfter, string className, string windowTitle);
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
@@ -71,6 +76,12 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool GetSystemTimes(out long lpIdle, out long lpKernel, out long lpUser);
+
+        [DllImport("kernel32.dll")]
+        public static extern IntPtr GetCurrentProcess();
+
+        [DllImport("psapi.dll")]
+        public static extern bool EmptyWorkingSet(IntPtr hProcess);
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -159,6 +170,109 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         private static int _consecutiveFullscreenTicks = 0;
         private static bool _hasCpuTemp = false;
 
+        // Positioning, layout and user preferences
+        private static int _posMode = 0; // 0 = Auto, 1 = Flush Left, 2 = Left of Tray, 3 = Custom (Draggable)
+        private static int _customX = 0;
+        private static int _customY = 0;
+        private static bool _isLocked = true;
+        private static bool _compactMode = false;
+        private static string _tempUnit = "Celsius";
+        private static double _cachedGpuTempC = 0.0;
+        private static bool _cachedGpuTempValid = false;
+
+        private static string GetConfigPath() {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string dir = Path.Combine(appData, "Win11TaskbarMonitor");
+            if (!Directory.Exists(dir)) {
+                try { Directory.CreateDirectory(dir); } catch {}
+            }
+            return Path.Combine(dir, "settings.json");
+        }
+
+        private static void LoadConfig() {
+            try {
+                string path = GetConfigPath();
+                if (!File.Exists(path)) {
+                    string fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WinTaskbarMonitor", "settings.json");
+                    if (File.Exists(fallback)) path = fallback;
+                }
+                if (File.Exists(path)) {
+                    string json = File.ReadAllText(path);
+                    using (JsonDocument doc = JsonDocument.Parse(json)) {
+                        var root = doc.RootElement;
+                        if (root.TryGetProperty("Alignment", out var propAlign)) {
+                            string a = propAlign.GetString();
+                            if (string.Equals(a, "Custom", StringComparison.OrdinalIgnoreCase)) _posMode = 3;
+                            else if (string.Equals(a, "LeftOfTray", StringComparison.OrdinalIgnoreCase)) _posMode = 2;
+                            else if (string.Equals(a, "FlushLeft", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "LeftEdge", StringComparison.OrdinalIgnoreCase)) _posMode = 1;
+                            else _posMode = 0;
+                        }
+                        if (root.TryGetProperty("IsLocked", out var propLocked)) _isLocked = propLocked.GetBoolean();
+                        if (root.TryGetProperty("CompactMode", out var propCompact)) _compactMode = propCompact.GetBoolean();
+                        if (root.TryGetProperty("CustomX", out var propX)) _customX = propX.GetInt32();
+                        if (root.TryGetProperty("CustomY", out var propY)) _customY = propY.GetInt32();
+                        if (root.TryGetProperty("SelectedGpuIndex", out var propGpu)) {
+                            int g = propGpu.GetInt32();
+                            if (g == 0) _gpuMode = 0;
+                            else if (g == 1) _gpuMode = 1;
+                            else _gpuMode = 2;
+                        }
+                        if (root.TryGetProperty("TemperatureUnit", out var propUnit)) {
+                            string u = propUnit.GetString();
+                            _tempUnit = string.Equals(u, "Fahrenheit", StringComparison.OrdinalIgnoreCase) ? "Fahrenheit" : "Celsius";
+                        }
+                        if (root.TryGetProperty("StyleMode", out var propStyle)) _styleMode = propStyle.GetInt32();
+                    }
+                }
+            } catch {}
+        }
+
+        private static void SaveConfig() {
+            try {
+                string path = GetConfigPath();
+                string alignStr = _posMode switch {
+                    1 => "FlushLeft",
+                    2 => "LeftOfTray",
+                    3 => "Custom",
+                    _ => "Auto"
+                };
+                int selectedGpu = _gpuMode switch {
+                    0 => 0,
+                    1 => 1,
+                    _ => -1
+                };
+
+                var cfg = new {
+                    RefreshIntervalMs = 1000,
+                    ShowCpu = true,
+                    ShowGpu = true,
+                    ShowCpuTemp = _hasCpuTemp,
+                    ShowGpuTemp = true,
+                    ShowRam = true,
+                    TemperatureUnit = _tempUnit,
+                    ThemeMode = "System",
+                    Alignment = alignStr,
+                    FontSize = _compactMode ? 9.5 : 11.5,
+                    CompactMode = _compactMode,
+                    SelectedGpuIndex = selectedGpu,
+                    IsLocked = _isLocked,
+                    CustomX = _customX,
+                    CustomY = _customY,
+                    StyleMode = _styleMode
+                };
+                string json = JsonSerializer.Serialize(cfg, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(path, json);
+            } catch {}
+        }
+
+        private static string FormatTemp(double c) {
+            if (string.Equals(_tempUnit, "Fahrenheit", StringComparison.OrdinalIgnoreCase)) {
+                double f = c * 9.0 / 5.0 + 32.0;
+                return Math.Round(f) + "\u00B0F";
+            }
+            return Math.Round(c) + "\u00B0C";
+        }
+
         private static SolidColorBrush CreateFrozenBrush(byte r, byte g, byte b, byte a = 255) {
             SolidColorBrush brush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(a, r, g, b));
             brush.Freeze();
@@ -185,6 +299,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         private static volatile bool _cachedCpuTempValid = false;
 
         private static Timer _bgTimer = null;
+        private static int _trimCounter = 0;
 
         private static double? QueryCpuTemp() {
             try {
@@ -208,6 +323,11 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
         private static void PollHardware(object state) {
             try {
+                _trimCounter++;
+                if (_trimCounter % 30 == 0) {
+                    try { EmptyWorkingSet(GetCurrentProcess()); } catch {}
+                }
+
                 if (_hasPdh) {
                     try { PdhCollectQueryData(_hPdhQuery); } catch {}
                 }
@@ -256,7 +376,9 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                         }
                         uint temp;
                         if (nvmlDeviceGetTemperature(_nvmlDev, 0, out temp) == 0 && temp > 0 && temp < 125) {
-                            _cachedGpuTempStr = temp + "\u00B0C";
+                            _cachedGpuTempC = temp;
+                            _cachedGpuTempValid = true;
+                            _cachedGpuTempStr = FormatTemp(temp);
                             _cachedGpuTempIsCritical = temp >= 85;
                             _cachedGpuTempIsElevated = temp >= 75 && temp < 85;
                         }
@@ -300,6 +422,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                     gpuPct = _hasNvml ? nvmlGpu : pdhMaxEngine;
                 } else if (_gpuMode == 1) {
                     gpuPct = intel3d > 0 ? intel3d : pdhMaxEngine;
+                    _cachedGpuTempValid = false;
                     _cachedGpuTempStr = "N/A";
                     _cachedGpuTempIsCritical = false;
                     _cachedGpuTempIsElevated = false;
@@ -353,11 +476,29 @@ namespace Win11TaskbarMonitor.LiveDaemon {
             return false;
         }
 
+        [STAThread]
+        public static void Main(string[] args) {
+            int posX = 0;
+            string capPath = null;
+            if (args != null && args.Length > 0) {
+                int.TryParse(args[0], out posX);
+            }
+            if (args != null && args.Length > 1) {
+                capPath = args[1];
+            }
+            Launch(posX, capPath);
+        }
         public static void Launch(int posX, string capPath) {
             bool isNew;
-            _singleInstanceMutex = new Mutex(true, @"Local\Win11TaskbarMonitor_SingleInstance_Mutex", out isNew);
+            _singleInstanceMutex = new Mutex(true, @"Local\Win11TaskbarMonitor_Native_Mutex_v2", out isNew);
             if (!isNew) {
                 return;
+            }
+
+            LoadConfig();
+            if (posX > 0) {
+                _posMode = 3;
+                _customX = posX;
             }
 
             IntPtr hDesk = OpenDesktop("Default", 0, false, 0x01FF);
@@ -441,22 +582,9 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 }
 
                 int trayH = rTray.Bottom - rTray.Top;
-                int widgetH = 34;
-                _cachedSmartMargin = Math.Max(2, (trayH - widgetH) / 2);
-
-                // Initial position: inspect if adjacent overlay is visible, place cleanly beside it
-                int initialX = rTray.Left + 12;
-                IntPtr hInitAdj = FindWindow(_adjacentWndClass, null);
-                if (hInitAdj != IntPtr.Zero && IsWindowVisible(hInitAdj)) {
-                    RECT rK;
-                    if (GetWindowRect(hInitAdj, out rK) && rK.Right > 0 && rK.Right < 300) {
-                        initialX = rK.Right + 8;
-                    }
-                }
-                int defaultX = posX > 0 ? posX : initialX;
-                int defaultY = rTray.Top + _cachedSmartMargin;
-                win.Left = defaultX;
-                win.Top = defaultY;
+                _lastTrayH = trayH;
+                int widgetH = _compactMode || trayH <= 34 ? 24 : 34;
+                _cachedSmartMargin = Math.Max(1, (trayH - widgetH) / 2);
 
                 Border border = new Border();
                 border.CornerRadius = new CornerRadius(4);
@@ -551,13 +679,15 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 stack.Orientation = Orientation.Horizontal;
                 stack.VerticalAlignment = VerticalAlignment.Center;
 
+                TextBlock lblCpu, lblCpuT, lblRam, lblGpu, lblGpuT;
+
                 // Pre-populated with pre-warmed values & Tabular figures
                 TextBlock txtCpu = new TextBlock { Text = _cachedCpu + "%", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 32, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
                 Typography.SetNumeralAlignment(txtCpu, FontNumeralAlignment.Tabular);
 
-                TextBlock txtCpuT = new TextBlock { Text = "0\u00B0C", FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 36, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
+                TextBlock txtCpuT = new TextBlock { Text = FormatTemp(0), FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 36, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = System.Windows.Media.Brushes.White };
                 Typography.SetNumeralAlignment(txtCpuT, FontNumeralAlignment.Tabular);
-                StackPanel pnlCpuT = CreateItem("CPU\u00B0", txtCpuT);
+                StackPanel pnlCpuT = CreateItem("CPU\u00B0", txtCpuT, out lblCpuT);
                 System.Windows.Shapes.Rectangle sepCpuT = CreateSep();
 
                 pnlCpuT.Visibility = _hasCpuTemp ? Visibility.Visible : Visibility.Collapsed;
@@ -572,26 +702,162 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 TextBlock txtGpuT = new TextBlock { Text = _cachedGpuTempStr, FontSize = 11.5, FontWeight = FontWeights.SemiBold, MinWidth = 36, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = _brushGray };
                 Typography.SetNumeralAlignment(txtGpuT, FontNumeralAlignment.Tabular);
 
-                stack.Children.Add(CreateItem("CPU", txtCpu));
+                StackPanel pnlCpu = CreateItem("CPU", txtCpu, out lblCpu);
+                System.Windows.Shapes.Rectangle sepRam = CreateSep();
+                StackPanel pnlRam = CreateItem("RAM", txtRam, out lblRam);
+                System.Windows.Shapes.Rectangle sepGpu = CreateSep();
+                StackPanel pnlGpu = CreateItem("GPU", txtGpu, out lblGpu);
+                System.Windows.Shapes.Rectangle sepGpuT = CreateSep();
+                StackPanel pnlGpuT = CreateItem(string.Equals(_tempUnit, "Fahrenheit", StringComparison.OrdinalIgnoreCase) ? "GPU\u00B0F" : "GPU\u00B0C", txtGpuT, out lblGpuT);
+
+                stack.Children.Add(pnlCpu);
                 stack.Children.Add(sepCpuT);
                 stack.Children.Add(pnlCpuT);
-                stack.Children.Add(CreateSep());
-                stack.Children.Add(CreateItem("RAM", txtRam));
-                stack.Children.Add(CreateSep());
-                stack.Children.Add(CreateItem("GPU", txtGpu));
-                stack.Children.Add(CreateSep());
-                stack.Children.Add(CreateItem("GPU\u00B0C", txtGpuT));
+                stack.Children.Add(sepRam);
+                stack.Children.Add(pnlRam);
+                stack.Children.Add(sepGpu);
+                stack.Children.Add(pnlGpu);
+                stack.Children.Add(sepGpuT);
+                stack.Children.Add(pnlGpuT);
 
                 border.Child = stack;
                 win.Content = border;
 
+                var labels = new List<TextBlock> { lblCpu, lblRam, lblGpu, lblGpuT, lblCpuT };
+                var valBlocks = new List<TextBlock> { txtCpu, txtRam, txtGpu, txtGpuT, txtCpuT };
+                var panels = new List<StackPanel> { pnlCpu, pnlRam, pnlGpu, pnlGpuT, pnlCpuT };
+                var seps = new List<System.Windows.Shapes.Rectangle> { sepCpuT, sepRam, sepGpu, sepGpuT };
+
+                Action applySizing = () => {
+                    bool isSmall = _compactMode || _lastTrayH <= 34;
+                    bool isMedium = !_compactMode && _lastTrayH > 34 && _lastTrayH <= 40;
+
+                    double lblSize = isSmall ? 8.5 : isMedium ? 9.0 : 10.0;
+                    double valSize = isSmall ? 9.5 : isMedium ? 10.5 : 11.5;
+                    double itemMinWidth = isSmall ? 24.0 : isMedium ? 28.0 : 32.0;
+                    Thickness itemMargin = isSmall ? new Thickness(2, 0, 2, 0) : isMedium ? new Thickness(2.5, 0, 2.5, 0) : new Thickness(3, 0, 3, 0);
+                    Thickness lblMargin = isSmall || isMedium ? new Thickness(0, 0, 0, 0) : new Thickness(0, 0, 0, 1);
+                    double sepH = isSmall ? 12.0 : isMedium ? 15.0 : 18.0;
+                    Thickness sepMargin = isSmall ? new Thickness(2.5, 0, 2.5, 0) : isMedium ? new Thickness(3, 0, 3, 0) : new Thickness(4, 0, 4, 0);
+                    Thickness bdrPadding = isSmall ? new Thickness(4, 1, 4, 1) : isMedium ? new Thickness(5, 1.5, 5, 1.5) : new Thickness(6, 2, 6, 2);
+
+                    border.Padding = bdrPadding;
+                    foreach (var lbl in labels) {
+                        if (lbl != null) {
+                            lbl.FontSize = lblSize;
+                            lbl.Margin = lblMargin;
+                        }
+                    }
+                    foreach (var val in valBlocks) {
+                        if (val != null) {
+                            val.FontSize = valSize;
+                            val.MinWidth = itemMinWidth;
+                        }
+                    }
+                    foreach (var pnl in panels) {
+                        if (pnl != null) {
+                            pnl.Margin = itemMargin;
+                            pnl.MinWidth = itemMinWidth;
+                        }
+                    }
+                    foreach (var sep in seps) {
+                        if (sep != null) {
+                            sep.Height = sepH;
+                            sep.Margin = sepMargin;
+                        }
+                    }
+
+                    try { win.UpdateLayout(); } catch {}
+                    double estH = win.ActualHeight > 0 ? win.ActualHeight : (isSmall ? 24.0 : isMedium ? 28.0 : 34.0);
+                    _cachedSmartMargin = Math.Max(1, (int)Math.Round((_lastTrayH - estH) / 2.0));
+                };
+                applySizing();
+
+                Action<int, int> setClampedPosition = (int targetX, int targetY) => {
+                    double screenW = SystemParameters.PrimaryScreenWidth;
+                    double screenH = SystemParameters.PrimaryScreenHeight;
+                    double actualW = win.ActualWidth > 0 ? win.ActualWidth : (_compactMode ? 170.0 : 220.0);
+                    double actualH = win.ActualHeight > 0 ? win.ActualHeight : (_compactMode || _lastTrayH <= 34 ? 24.0 : 34.0);
+
+                    IntPtr curTray = FindWindow("Shell_TrayWnd", null);
+                    if (curTray != IntPtr.Zero) {
+                        RECT rCurTray;
+                        if (GetWindowRect(curTray, out rCurTray)) {
+                            if (targetX + actualW > rCurTray.Right - 2) {
+                                targetX = (int)(rCurTray.Right - actualW - 2);
+                            }
+                            if (targetX < rCurTray.Left + 2) {
+                                targetX = rCurTray.Left + 2;
+                            }
+
+                            int maxTop = rCurTray.Bottom - (int)actualH - 1;
+                            int minTop = rCurTray.Top + 1;
+                            if (targetY > maxTop) targetY = maxTop;
+                            if (targetY < minTop) targetY = minTop;
+                        }
+                    } else {
+                        if (targetX + actualW > screenW - 2) targetX = (int)(screenW - actualW - 2);
+                        if (targetX < 2) targetX = 2;
+                        if (targetY + actualH > screenH - 2) targetY = (int)(screenH - actualH - 2);
+                        if (targetY < 2) targetY = 2;
+                    }
+
+                    if (Math.Abs(win.Left - targetX) > 1.0 || Math.Abs(win.Top - targetY) > 1.0) {
+                        win.Left = targetX;
+                        win.Top = targetY;
+                    }
+                };
+
+                Action recalcPosition = () => {
+                    IntPtr curT = FindWindow("Shell_TrayWnd", null);
+                    RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
+                    if (curT != IntPtr.Zero) GetWindowRect(curT, out rt);
+
+                    int targetX = (int)win.Left;
+                    int targetY = rt.Top + _cachedSmartMargin;
+
+                    if (_posMode == 0) { // Smart Auto
+                        targetX = rt.Left + 12;
+                        IntPtr hAdj = FindWindow(_adjacentWndClass, null);
+                        if (hAdj != IntPtr.Zero && IsWindowVisible(hAdj)) {
+                            RECT rK;
+                            if (GetWindowRect(hAdj, out rK) && rK.Right > 0 && rK.Right < 300) {
+                                targetX = rK.Right + 8;
+                            }
+                        }
+                    } else if (_posMode == 1) { // Flush Left
+                        targetX = rt.Left + 4;
+                    } else if (_posMode == 2) { // Left of System Tray
+                        IntPtr hNotify = FindWindowEx(curT, IntPtr.Zero, "TrayNotifyWnd", null);
+                        int notifyLeft = 0;
+                        if (hNotify != IntPtr.Zero) {
+                            RECT rNotify;
+                            if (GetWindowRect(hNotify, out rNotify)) {
+                                notifyLeft = rNotify.Left;
+                            }
+                        }
+                        double actW = win.ActualWidth > 0 ? win.ActualWidth : (_compactMode ? 170.0 : 220.0);
+                        if (notifyLeft > 0) {
+                            targetX = notifyLeft - (int)actW - 8;
+                        } else {
+                            targetX = rt.Right - (int)actW - 160;
+                        }
+                    } else if (_posMode == 3) { // Custom Position
+                        targetX = _customX > 0 ? _customX : (rt.Left + 12);
+                        targetY = _customY > 0 ? _customY : (rt.Top + _cachedSmartMargin);
+                    }
+
+                    setClampedPosition(targetX, targetY);
+                };
+
+                recalcPosition();
+
                 // Dragging Support
                 bool isDragging = false;
                 System.Windows.Point dragStart = new System.Windows.Point();
-                bool isLocked = true;
 
                 border.MouseLeftButtonDown += (s, e) => {
-                    if (!isLocked) {
+                    if (!_isLocked) {
                         isDragging = true;
                         dragStart = e.GetPosition(win);
                         border.CaptureMouse();
@@ -600,68 +866,112 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 border.MouseMove += (s, e) => {
                     if (isDragging) {
                         System.Windows.Point cur = e.GetPosition(win);
-                        win.Left += cur.X - dragStart.X;
-                        win.Top += cur.Y - dragStart.Y;
+                        double nL = win.Left + (cur.X - dragStart.X);
+                        double nT = win.Top + (cur.Y - dragStart.Y);
+                        double sW = SystemParameters.PrimaryScreenWidth;
+                        double sH = SystemParameters.PrimaryScreenHeight;
+                        double aW = win.ActualWidth > 0 ? win.ActualWidth : 200.0;
+                        double aH = win.ActualHeight > 0 ? win.ActualHeight : 30.0;
+                        if (nL + aW > sW - 2) nL = sW - aW - 2;
+                        if (nL < 2) nL = 2;
+                        if (nT + aH > sH - 2) nT = sH - aH - 2;
+                        if (nT < 2) nT = 2;
+                        win.Left = nL;
+                        win.Top = nT;
                     }
                 };
+
+                MenuItem posAuto = new MenuItem { Header = "Smart Taskbar Offset (Auto)", IsCheckable = true, IsChecked = (_posMode == 0) };
+                MenuItem posLeft = new MenuItem { Header = "Taskbar Edge (Flush Left)", IsCheckable = true, IsChecked = (_posMode == 1) };
+                MenuItem posTray = new MenuItem { Header = "Left of System Tray", IsCheckable = true, IsChecked = (_posMode == 2) };
+                MenuItem posCustom = new MenuItem { Header = "Custom Position (Draggable)", IsCheckable = true, IsChecked = (_posMode == 3) };
+
+                Action updatePosMenuChecks = () => {
+                    posAuto.IsChecked = (_posMode == 0);
+                    posLeft.IsChecked = (_posMode == 1);
+                    posTray.IsChecked = (_posMode == 2);
+                    posCustom.IsChecked = (_posMode == 3);
+                };
+
                 border.MouseLeftButtonUp += (s, e) => {
                     if (isDragging) {
                         isDragging = false;
                         border.ReleaseMouseCapture();
+                        _posMode = 3; // Custom Position
+                        _customX = (int)win.Left;
+                        _customY = (int)win.Top;
+                        updatePosMenuChecks();
+                        SaveConfig();
                     }
                 };
 
                 // Context Menu
                 ContextMenu menu = new ContextMenu();
-                MenuItem itemLock = new MenuItem { Header = "Lock Position", IsCheckable = true, IsChecked = true };
-                itemLock.Click += (s, e) => { isLocked = itemLock.IsChecked; };
+                MenuItem itemLock = new MenuItem { Header = "Lock Position", IsCheckable = true, IsChecked = _isLocked };
+                itemLock.Click += (s, e) => {
+                    _isLocked = itemLock.IsChecked;
+                    SaveConfig();
+                };
+
+                MenuItem itemCompact = new MenuItem { Header = "Compact Mode (Low Res / Small Taskbars)", IsCheckable = true, IsChecked = _compactMode };
+                itemCompact.Click += (s, e) => {
+                    _compactMode = itemCompact.IsChecked;
+                    applySizing();
+                    recalcPosition();
+                    SaveConfig();
+                };
 
                 MenuItem posMenu = new MenuItem { Header = "Taskbar Alignment" };
-                MenuItem posAuto = new MenuItem { Header = "Smart Taskbar Offset (Auto)", IsChecked = true };
-                MenuItem posLeft = new MenuItem { Header = "Taskbar Edge (Flush Left)", IsChecked = false };
-                posLeft.Click += (s, e) => {
-                    posLeft.IsChecked = true; posAuto.IsChecked = false;
-                    IntPtr curT = FindWindow("Shell_TrayWnd", null);
-                    RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
-                    if (curT != IntPtr.Zero) GetWindowRect(curT, out rt);
-                    win.Left = rt.Left + 12;
-                    win.Top = rt.Top + _cachedSmartMargin;
-                };
                 posAuto.Click += (s, e) => {
-                    posLeft.IsChecked = false; posAuto.IsChecked = true;
-                    IntPtr curT = FindWindow("Shell_TrayWnd", null);
-                    RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
-                    if (curT != IntPtr.Zero) GetWindowRect(curT, out rt);
-                    int targetX = rt.Left + 12;
-                    IntPtr hAdj = FindWindow(_adjacentWndClass, null);
-                    if (hAdj != IntPtr.Zero && IsWindowVisible(hAdj)) {
-                        RECT rK;
-                        if (GetWindowRect(hAdj, out rK) && rK.Right > 0 && rK.Right < 300) {
-                            targetX = rK.Right + 8;
-                        }
-                    }
-                    win.Left = targetX;
-                    win.Top = rt.Top + _cachedSmartMargin;
+                    _posMode = 0;
+                    updatePosMenuChecks();
+                    recalcPosition();
+                    SaveConfig();
                 };
+                posLeft.Click += (s, e) => {
+                    _posMode = 1;
+                    updatePosMenuChecks();
+                    recalcPosition();
+                    SaveConfig();
+                };
+                posTray.Click += (s, e) => {
+                    _posMode = 2;
+                    updatePosMenuChecks();
+                    recalcPosition();
+                    SaveConfig();
+                };
+                posCustom.Click += (s, e) => {
+                    _posMode = 3;
+                    _customX = (int)win.Left;
+                    _customY = (int)win.Top;
+                    updatePosMenuChecks();
+                    SaveConfig();
+                };
+
                 posMenu.Items.Add(posAuto);
                 posMenu.Items.Add(posLeft);
+                posMenu.Items.Add(posTray);
+                posMenu.Items.Add(posCustom);
 
                 MenuItem gpuMenu = new MenuItem { Header = "GPU Telemetry Source" };
-                MenuItem gpuAuto = new MenuItem { Header = "Auto (All GPUs - Default)", IsCheckable = true, IsChecked = true };
-                MenuItem gpuNvidia = new MenuItem { Header = "NVIDIA GeForce MX350 (Discrete)", IsCheckable = true, IsChecked = false };
-                MenuItem gpuIntel = new MenuItem { Header = "Intel(R) Iris(R) Xe Graphics (Integrated - GPU 0)", IsCheckable = true, IsChecked = false };
+                MenuItem gpuAuto = new MenuItem { Header = "Auto (All GPUs - Default)", IsCheckable = true, IsChecked = (_gpuMode == 2) };
+                MenuItem gpuNvidia = new MenuItem { Header = "NVIDIA GeForce MX350 (Discrete)", IsCheckable = true, IsChecked = (_gpuMode == 0) };
+                MenuItem gpuIntel = new MenuItem { Header = "Intel(R) Iris(R) Xe Graphics (Integrated - GPU 0)", IsCheckable = true, IsChecked = (_gpuMode == 1) };
 
                 gpuAuto.Click += (s, e) => {
                     _gpuMode = 2;
                     gpuAuto.IsChecked = true; gpuNvidia.IsChecked = false; gpuIntel.IsChecked = false;
+                    SaveConfig();
                 };
                 gpuNvidia.Click += (s, e) => {
                     _gpuMode = 0;
                     gpuAuto.IsChecked = false; gpuNvidia.IsChecked = true; gpuIntel.IsChecked = false;
+                    SaveConfig();
                 };
                 gpuIntel.Click += (s, e) => {
                     _gpuMode = 1;
                     gpuAuto.IsChecked = false; gpuNvidia.IsChecked = false; gpuIntel.IsChecked = true;
+                    SaveConfig();
                 };
                 gpuMenu.Items.Add(gpuAuto);
                 gpuMenu.Items.Add(gpuNvidia);
@@ -669,11 +979,9 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                 MenuItem itemReset = new MenuItem { Header = "Recalculate Equal Margins" };
                 itemReset.Click += (s, e) => {
-                    IntPtr curT = FindWindow("Shell_TrayWnd", null);
-                    RECT rt = new RECT { Left = 0, Top = 1032, Right = 1920, Bottom = 1080 };
-                    if (curT != IntPtr.Zero) GetWindowRect(curT, out rt);
-                    int sm = Math.Max(2, (int)Math.Round(((rt.Bottom - rt.Top) - border.ActualHeight) / 2.0));
-                    win.Top = rt.Top + sm;
+                    applySizing();
+                    recalcPosition();
+                    SaveConfig();
                 };
 
                 MenuItem itemExit = new MenuItem { Header = "Exit Monitor" };
@@ -684,24 +992,27 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 };
 
                 MenuItem styleMenu = new MenuItem { Header = "Taskbar Style & Appearance" };
-                MenuItem styleNative = new MenuItem { Header = "Native Taskbar (Flush on Glass - Default)", IsCheckable = true, IsChecked = true };
-                MenuItem stylePill = new MenuItem { Header = "Fluent Capsule (Subtle Pill)", IsCheckable = true, IsChecked = false };
-                MenuItem styleCard = new MenuItem { Header = "Floating HUD Card", IsCheckable = true, IsChecked = false };
+                MenuItem styleNative = new MenuItem { Header = "Native Taskbar (Flush on Glass - Default)", IsCheckable = true, IsChecked = (_styleMode == 0) };
+                MenuItem stylePill = new MenuItem { Header = "Fluent Capsule (Subtle Pill)", IsCheckable = true, IsChecked = (_styleMode == 1) };
+                MenuItem styleCard = new MenuItem { Header = "Floating HUD Card", IsCheckable = true, IsChecked = (_styleMode == 2) };
 
                 styleNative.Click += (s, e) => {
                     _styleMode = 0;
                     styleNative.IsChecked = true; stylePill.IsChecked = false; styleCard.IsChecked = false;
                     applyStyle();
+                    SaveConfig();
                 };
                 stylePill.Click += (s, e) => {
                     _styleMode = 1;
                     styleNative.IsChecked = false; stylePill.IsChecked = true; styleCard.IsChecked = false;
                     applyStyle();
+                    SaveConfig();
                 };
                 styleCard.Click += (s, e) => {
                     _styleMode = 2;
                     styleNative.IsChecked = false; stylePill.IsChecked = false; styleCard.IsChecked = true;
                     applyStyle();
+                    SaveConfig();
                 };
 
                 styleMenu.Items.Add(styleNative);
@@ -709,6 +1020,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 styleMenu.Items.Add(styleCard);
 
                 menu.Items.Add(itemLock);
+                menu.Items.Add(itemCompact);
                 menu.Items.Add(posMenu);
                 menu.Items.Add(gpuMenu);
                 menu.Items.Add(styleMenu);
@@ -741,7 +1053,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                         if (_hasCpuTemp && _cachedCpuTempValid) {
                             double ct = _cachedCpuTemp;
-                            txtCpuT.Text = Math.Round(ct) + "\u00B0C";
+                            txtCpuT.Text = FormatTemp(ct);
                             txtCpuT.Foreground = ct >= 85 ? _brushRed : ct >= 75 ? _brushAmber : _brushWhite;
                         }
 
@@ -750,7 +1062,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                             ? string.Format("CPU: {0} ({1})", txtCpu.Text, txtCpuT.Text)
                             : string.Format("CPU: {0}", txtCpu.Text);
                         string ramLine = string.Format("RAM: {0:F1} / {1:F1} GB ({2})", _cachedUsedGb, _cachedTotGb, txtRam.Text);
-                        string gpuLine = _hasNvml 
+                        string gpuLine = (_hasNvml && _cachedGpuTempValid) 
                             ? string.Format("GPU: {0} ({1})", txtGpu.Text, txtGpuT.Text)
                             : string.Format("GPU: {0}", txtGpu.Text);
                         ttText.Text = string.Format("{0}\n{1}\n{2}", cpuLine, ramLine, gpuLine);
@@ -764,24 +1076,11 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                             if (curTrayH != _lastTrayH && curTrayH > 20) {
                                 _lastTrayH = curTrayH;
-                                double contentH = border.ActualHeight > 0 ? border.ActualHeight : 34.0;
-                                _cachedSmartMargin = Math.Max(2, (int)Math.Round((curTrayH - contentH) / 2.0));
+                                applySizing();
                             }
 
-                            if (isLocked) {
-                                int targetX = rCurTray.Left + 12;
-                                IntPtr hAdj = FindWindow(_adjacentWndClass, null);
-                                if (hAdj != IntPtr.Zero && IsWindowVisible(hAdj)) {
-                                    RECT rK;
-                                    if (GetWindowRect(hAdj, out rK) && rK.Right > 0 && rK.Right < 300) {
-                                        targetX = rK.Right + 8; // Clean 8px gap beside adjacent widget
-                                    }
-                                }
-                                int targetY = rCurTray.Top + _cachedSmartMargin;
-                                if (Math.Abs(win.Left - targetX) > 1.0 || Math.Abs(win.Top - targetY) > 1.0) {
-                                    win.Left = targetX;
-                                    win.Top = targetY;
-                                }
+                            if (_isLocked && !isDragging) {
+                                recalcPosition();
                             }
 
                             // Re-bind Win32 owner ONLY if tray handle changed (e.g. Explorer restart)
@@ -829,6 +1128,14 @@ namespace Win11TaskbarMonitor.LiveDaemon {
 
                     // Start UI timer
                     timer.Start();
+
+                    DispatcherTimer initTrim = new DispatcherTimer();
+                    initTrim.Interval = TimeSpan.FromSeconds(1.5);
+                    initTrim.Tick += (its, ite) => {
+                        initTrim.Stop();
+                        try { EmptyWorkingSet(GetCurrentProcess()); } catch {}
+                    };
+                    initTrim.Start();
 
                     if (!string.IsNullOrEmpty(capPath)) {
                         DispatcherTimer capTimer = new DispatcherTimer();
@@ -879,7 +1186,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
             t.Join();
         }
 
-        private static StackPanel CreateItem(string label, TextBlock valBlock) {
+        private static StackPanel CreateItem(string label, TextBlock valBlock, out TextBlock lblOut) {
             StackPanel p = new StackPanel { 
                 Orientation = Orientation.Vertical, 
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -896,11 +1203,17 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 TextAlignment = TextAlignment.Center, 
                 Margin = new Thickness(0, 0, 0, 1) 
             };
+            lblOut = lbl;
             valBlock.HorizontalAlignment = HorizontalAlignment.Center;
             valBlock.TextAlignment = TextAlignment.Center;
             p.Children.Add(lbl);
             p.Children.Add(valBlock);
             return p;
+        }
+
+        private static StackPanel CreateItem(string label, TextBlock valBlock) {
+            TextBlock dummy;
+            return CreateItem(label, valBlock, out dummy);
         }
 
         private static System.Windows.Shapes.Rectangle CreateSep() {
@@ -914,3 +1227,4 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         }
     }
 }
+

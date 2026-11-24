@@ -4,31 +4,39 @@
 
 **Project**: Win11TaskbarMonitor  
 **Objective**: Build a lightweight, native, and highly reliable Windows 11 taskbar hardware telemetry utility (CPU, GPU, CPU Temp, GPU Temp, RAM) without bloat, web dependencies, or excessive resource overhead.  
-**Current Milestone**: Set GPU Telemetry Source to Auto by default across all GPUs (Intel Iris Xe + NVIDIA MX350 peak engine tracking with NVML thermals). Application runs independently with zero PowerShell or CMD dependency, sequence arranged as `CPU | RAM | GPU | GPU°C`, zero third-party references, top-popping hover tooltip, and packaged into universal release zip (`dist/Win11TaskbarMonitor-Setup.zip`). Installed onto the host system at `%LOCALAPPDATA%\Programs\Win11TaskbarMonitor`.
-
+**Current Milestone**: Resolved custom taskbar & low-resolution overflow via responsive vertical scaling (`applySizing`) and strict multi-boundary screen clamping (`setClampedPosition`). Fixed "Lock Position" snapping-back bug to retain manual drag coordinates across locks and reboots. Added alignment modes ("Left of System Tray", "Smart Taskbar Offset (Auto)", "Taskbar Edge (Flush Left)", "Custom Position (Draggable)") and "Compact Mode" toggle. Full `settings.json` persistence integrated.
+ 
 ---
-
+ 
 ## 2. Environment & Repository Status
-
+ 
 - **Operating System**: Windows 11 Build 26300 (x64)
 - **CPU**: 11th Gen Intel(R) Core(TM) i5-1135G7 (4 cores, 8 threads)
 - **GPUs Detected & Monitored**:
   1. Intel(R) Iris(R) Xe Graphics (Integrated)
   2. NVIDIA GeForce MX350 (Discrete, verified via NVML)
 - **Runtime & SDK**: .NET 8 SDK 8.0.428 in `%LOCALAPPDATA%\dotnet`.
-- **Active Process**: PID 15936 (`Win11TaskbarMonitor.exe` standalone native process, ~24 MB working set).
+- **Active Process**: PID 10560 (`Win11TaskbarMonitor.exe` standalone native process, ~24 MB working set).
 - **Git Repository**: Initialized and published to GitHub.
   - Remote: `https://github.com/slayershark/win11-taskbar-monitor.git` (`origin/master`)
-  - Latest Tag: `v1.2.2` (pushed to origin)
+  - Latest Tag: `v1.3.1`
   - GitHub Actions: Automated CI (`ci.yml`) and Release Packaging (`release.yml`) active
   - Identity configured at repo level:
     - `user.name`: `slayershark`
     - `user.email`: `sandeepsuwal9@gmail.com`
   - Current Branch: `master` (tracking `origin/master`)
-
+ 
 ---
-
+ 
 ## 3. Completed Features
+
+- [x] **Fix Lock Position Snapping, Low-Res / Custom Taskbar Overflow, and Settings Persistence (v1.3.1)**:
+  - Fixed snapping-back bug: Unlocking, dragging, and re-locking retains custom coordinates (`_customX`, `_customY`). Releasing drag automatically selects `Custom Position (Draggable)` and saves to `%APPDATA%\Win11TaskbarMonitor\settings.json`.
+  - Added responsive dynamic sizing (`applySizing`): When taskbar height <= 34px (or Compact Mode enabled), font sizes shrink (8.5pt/9.5pt), item margins drop, padding becomes (4,1,4,1), and separator height reduces to 12px, lowering widget height from 34px to ~22-24px with zero vertical overflow.
+  - Added strict screen and taskbar boundary clamping (`setClampedPosition`): Widget cannot overflow screen edges or taskbar vertical bounds.
+  - Added "Left of System Tray" alignment preset: automatically anchors to the empty space right before the system tray notification area (`TrayNotifyWnd`).
+  - Added "Compact Mode (Low Res / Small Taskbars)" toggle in right-click context menu.
+  - Full configuration persistence in `settings.json` loaded upon startup.
 
 - [x] **Default GPU Telemetry Source Set to Auto Across All GPUs**:
   - Configured default GPU telemetry mode to Auto (`_gpuMode = 2`) across native monitor implementations (`src/NativeMonitor/Program.cs` and `scripts/LiveDaemon.cs`).
