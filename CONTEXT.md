@@ -4,7 +4,7 @@
 
 **Project**: Win11TaskbarMonitor  
 **Objective**: Build a lightweight, native, and highly reliable Windows 11 taskbar hardware telemetry utility (CPU, GPU, CPU Temp, GPU Temp, RAM) without bloat, web dependencies, or excessive resource overhead.  
-**Current Milestone**: Resolved custom taskbar & low-resolution overflow via responsive vertical scaling (`applySizing`) and strict multi-boundary screen clamping (`setClampedPosition`). Fixed "Lock Position" snapping-back bug to retain manual drag coordinates across locks and reboots. Added alignment modes ("Left of System Tray", "Smart Taskbar Offset (Auto)", "Taskbar Edge (Flush Left)", "Custom Position (Draggable)") and "Compact Mode" toggle. Full `settings.json` persistence integrated.
+**Current Milestone**: Universal Dynamic GPU Hardware Detection (v1.3.2). Dynamically discovers AMD, Intel, and NVIDIA graphics hardware during installation and runtime; eliminated all hardcoded GPU model strings across installer UI, context menus, tooltips, and configuration files. Full `settings.json` integration (`SelectedGpuIndex`, `SelectedGpuName`) and multi-vendor test suite.
  
 ---
  
@@ -16,10 +16,10 @@
   1. Intel(R) Iris(R) Xe Graphics (Integrated)
   2. NVIDIA GeForce MX350 (Discrete, verified via NVML)
 - **Runtime & SDK**: .NET 8 SDK 8.0.428 in `%LOCALAPPDATA%\dotnet`.
-- **Active Process**: PID 10560 (`Win11TaskbarMonitor.exe` standalone native process, ~24 MB working set).
+- **Active Process**: PID 10736 (`Win11TaskbarMonitor.exe` standalone native process, ~25 MB working set).
 - **Git Repository**: Initialized and published to GitHub.
   - Remote: `https://github.com/slayershark/win11-taskbar-monitor.git` (`origin/master`)
-  - Latest Tag: `v1.3.1`
+  - Latest Tag: `v1.3.1` (next: `v1.3.2`)
   - GitHub Actions: Automated CI (`ci.yml`) and Release Packaging (`release.yml`) active
   - Identity configured at repo level:
     - `user.name`: `slayershark`
@@ -29,6 +29,14 @@
 ---
  
 ## 3. Completed Features
+
+- [x] **Universal Dynamic GPU Hardware Detection (v1.3.2)**:
+  - Dynamically discovers all installed graphics cards via WMI `Win32_VideoController` with registry fallback.
+  - Identifies vendor and type: AMD (Discrete / Integrated), Intel (Arc Discrete / Iris Integrated), NVIDIA (Discrete), and Generic.
+  - Setup installer (`Win11TaskbarMonitor-Setup.exe`) dynamically renders detected GPUs in "GPU Telemetry Source" preference dropdown.
+  - Native monitor right-click context menu and hover tooltip dynamically reflect installed GPUs instead of hardcoded strings.
+  - Persists `SelectedGpuIndex` and `SelectedGpuName` into `settings.json`.
+  - Added `tests/test_gpu_cleanliness.ps1` and updated `tests/run_tests.ps1` (19/19 tests passing).
 
 - [x] **Fix Lock Position Snapping, Low-Res / Custom Taskbar Overflow, and Settings Persistence (v1.3.1)**:
   - Fixed snapping-back bug: Unlocking, dragging, and re-locking retains custom coordinates (`_customX`, `_customY`). Releasing drag automatically selects `Custom Position (Draggable)` and saves to `%APPDATA%\Win11TaskbarMonitor\settings.json`.

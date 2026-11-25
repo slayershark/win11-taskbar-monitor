@@ -44,7 +44,7 @@
                         <StackPanel>
                             <TextBlock Text="Key Features &amp; Architecture:" FontWeight="SemiBold" FontSize="12.5" Margin="0,0,0,6" />
                             <TextBlock Text="• Sequence: CPU | RAM | GPU | GPU°C with tabular figures" Foreground="#BBBBBB" FontSize="12" Margin="0,2" />
-                            <TextBlock Text="• Auto GPU Telemetry: Dynamic peak tracking across Intel and NVIDIA GPUs" Foreground="#BBBBBB" FontSize="12" Margin="0,2" />
+                            <TextBlock Text="• Auto GPU Telemetry: Dynamic peak tracking across all detected GPUs (AMD, Intel, NVIDIA)" Foreground="#BBBBBB" FontSize="12" Margin="0,2" />
                             <TextBlock Text="• Top-popping Fluent hover tooltip with detailed hardware breakdown" Foreground="#BBBBBB" FontSize="12" Margin="0,2" />
                             <TextBlock Text="• Native Standalone Executable: Zero PowerShell or CMD window dependency" Foreground="#BBBBBB" FontSize="12" Margin="0,2" />
                             <TextBlock Text="• Resource Friendly: &lt; 0.5% CPU overhead, &lt; 35 MB RAM footprint" Foreground="#BBBBBB" FontSize="12" Margin="0,2" />
@@ -98,8 +98,6 @@
                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="GPU Telemetry Source:" VerticalAlignment="Center" FontSize="12.5" Margin="0,4" />
                                 <ComboBox x:Name="CmbGpuMode" Grid.Row="0" Grid.Column="1" Height="30" Margin="0,4" SelectedIndex="0">
                                     <ComboBoxItem Content="Auto (All GPUs - Recommended Default)" />
-                                    <ComboBoxItem Content="Discrete NVIDIA GPU (NVML Hardware Streaming)" />
-                                    <ComboBoxItem Content="Integrated Intel Iris Xe Graphics" />
                                 </ComboBox>
 
                                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Temperature Unit:" VerticalAlignment="Center" FontSize="12.5" Margin="0,4" />

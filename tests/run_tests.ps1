@@ -95,7 +95,12 @@ Assert-Condition "Used RAM <= Total RAM" ($usedMemGb -le $totalMemGb -and $usedM
 Assert-Condition "RAM Percentage Range (0-100%)" ($memPct -ge 0.0 -and $memPct -le 100.0) "Calculated: $memPct%"
 
 # --- TEST 3: GPU & Temperature Telemetry Verification ---
-Write-Output "`n[3/5] Testing GPU & Temperature Providers (NVML)..."
+Write-Output "`n[3/5] Testing GPU & Temperature Providers (NVML / Dynamic Detection)..."
+$detectedGpus = @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | Where-Object { 
+    $_.Name -and $_.Name -notmatch "Remote|Virtual|Mirror|Basic Display" 
+})
+Assert-Condition "Hardware GPU Detection" ($detectedGpus.Count -ge 1) "Detected $($detectedGpus.Count) GPU(s): $(($detectedGpus.Name) -join ', ')"
+
 $sigNvml = @"
 using System;
 using System.Runtime.InteropServices;

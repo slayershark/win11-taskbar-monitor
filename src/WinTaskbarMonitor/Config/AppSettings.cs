@@ -39,6 +39,8 @@ public sealed class AppSettings
     /// </summary>
     public int SelectedGpuIndex { get; set; } = -1;
 
+    public string SelectedGpuName { get; set; } = "";
+
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public TemperatureUnit TemperatureUnit { get; set; } = TemperatureUnit.Celsius;
 

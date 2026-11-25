@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.Management" Version="8.0.0" />
     <EmbeddedResource Include="payload.zip" Condition="Exists('payload.zip')" />
     <Resource Include="..\..\assets\app.ico">
       <Link>app.ico</Link>

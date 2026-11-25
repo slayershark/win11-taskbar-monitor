@@ -5,6 +5,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.3.2] - 2026-11-25
+
+### Added
+- **Universal Dynamic GPU Hardware Detection (`GpuDetector`)**:
+  - Implemented dynamic hardware discovery via WMI `Win32_VideoController` (`SELECT Name, PNPDeviceID, AdapterRAM`) with automatic fallback to Windows Display Class registry keys (`HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}`).
+  - Dynamically detects and categorizes GPUs across all major vendors:
+    - **AMD**: Radeon RX / PRO / XT (Discrete) vs. Radeon(TM) Graphics (Integrated).
+    - **Intel**: Intel Arc (Discrete) vs. Iris Xe / UHD / HD Graphics (Integrated).
+    - **NVIDIA**: GeForce / RTX / GTX / Quadro (Discrete).
+    - **Generic**: Standard Display Adapter fallback.
+- **Dynamic Installer Hardware Preferences**:
+  - `Win11TaskbarMonitor-Setup.exe` dynamically detects installed graphics cards on the target system and populates the "GPU Telemetry Source" ComboBox with detected adapters.
+  - Retains "Auto (All GPUs - Recommended Default)" as the top recommended default choice.
+  - Persists `SelectedGpuIndex` and `SelectedGpuName` into `%APPDATA%\Win11TaskbarMonitor\settings.json`.
+- **Dynamic Monitor Context Menu & Hover Tooltip**:
+  - Replaced hardcoded "NVIDIA GeForce MX350" and "Intel Iris Xe" menu items with dynamically generated menu items reflecting target system hardware.
+  - Tooltip dynamically incorporates the active GPU name (e.g. `GPU (AMD Radeon RX 6700 XT): 14%` or `GPU (NVIDIA GeForce MX350): 5% (52°C)`).
+- **Universal Build Script (`scripts/Build-All.ps1`)**:
+  - Consolidated complete pipeline for compiling `NativeMonitor`, packing `payload.zip`, compiling `Win11TaskbarMonitor-Setup.exe`, and creating distribution archives.
+
+### Fixed
+- **Eliminated Hardcoded GPU Strings**:
+  - Removed all hardcoded GPU model strings from `src/Installer/MainWindow.xaml`, `src/Installer/MainWindow.xaml.cs`, `src/NativeMonitor/Program.cs`, and `scripts/LiveDaemon.cs`.
+  - Added automated regression test `tests/test_gpu_cleanliness.ps1` to prevent future hardcoding regressions.
+- **Automated Test Suite Portability**:
+  - Updated `tests/run_tests.ps1` to dynamically detect video controllers and verify GPU counters across AMD, Intel, and NVIDIA configurations without requiring NVML on non-NVIDIA systems.
+
+---
+
 ## [1.3.1] - 2026-11-24
 
 ### Fixed

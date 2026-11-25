@@ -94,8 +94,8 @@ directly on the left side of your taskbar with pixel-perfect equal margins.
 
 FEATURES:
   * Sequence: CPU | RAM | GPU | GPU°C
-  * Auto GPU Telemetry: dynamically monitors integrated (Intel Iris Xe)
-    and discrete (NVIDIA) GPUs via peak engine metrics and NVML thermals
+  * Auto GPU Telemetry: dynamically detects and monitors all installed GPUs (AMD, Intel, NVIDIA)
+    via peak engine metrics and hardware thermals
   * Top-popping Fluent hover tooltip with detailed hardware breakdown
   * Native Standalone Executable: zero PowerShell/CMD window dependency
   * Zero-overhead: < 0.5% CPU, < 40 MB RAM

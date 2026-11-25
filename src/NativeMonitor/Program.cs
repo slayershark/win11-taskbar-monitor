@@ -17,6 +17,167 @@ using System.Windows.Controls.Primitives;
 using System.Management;
 
 namespace Win11TaskbarMonitor.LiveDaemon {
+    public class DetectedGpu
+    {
+        public int Index { get; set; }
+        public string Name { get; set; } = "";
+        public string Vendor { get; set; } = "Other";
+        public bool IsDiscrete { get; set; }
+        public string DisplayText { get; set; } = "";
+    }
+
+    public static class GpuDetector
+    {
+        public static List<DetectedGpu> Detect()
+        {
+            var list = new List<DetectedGpu>();
+            var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                using var searcher = new ManagementObjectSearcher(@"root\CIMV2", "SELECT Name, PNPDeviceID, AdapterRAM FROM Win32_VideoController");
+                using var collection = searcher.Get();
+                foreach (ManagementObject obj in collection)
+                {
+                    string name = obj["Name"]?.ToString()?.Trim() ?? "";
+                    string pnp = obj["PNPDeviceID"]?.ToString()?.Trim() ?? "";
+                    if (string.IsNullOrEmpty(name)) continue;
+
+                    if (name.Contains("Remote", StringComparison.OrdinalIgnoreCase) ||
+                        name.Contains("Virtual", StringComparison.OrdinalIgnoreCase) ||
+                        name.Contains("Mirror", StringComparison.OrdinalIgnoreCase) ||
+                        name.Contains("Basic Display", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (seenNames.Contains(name)) continue;
+                    seenNames.Add(name);
+
+                    string vendor = "Other";
+                    bool isDiscrete = false;
+
+                    if (pnp.IndexOf("VEN_10DE", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        name.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        name.IndexOf("GeForce", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        name.IndexOf("Quadro", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        name.IndexOf("RTX", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        name.IndexOf("GTX", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        vendor = "NVIDIA";
+                        isDiscrete = true;
+                    }
+                    else if (pnp.IndexOf("VEN_1002", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             name.IndexOf("AMD", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             name.IndexOf("Radeon", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             name.IndexOf("ATI", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        vendor = "AMD";
+                        bool isIntegrated = name.IndexOf("Graphics", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                                            name.IndexOf("RX", StringComparison.OrdinalIgnoreCase) < 0 &&
+                                            name.IndexOf("Pro", StringComparison.OrdinalIgnoreCase) < 0 &&
+                                            name.IndexOf("XT", StringComparison.OrdinalIgnoreCase) < 0;
+                        isDiscrete = !isIntegrated;
+                    }
+                    else if (pnp.IndexOf("VEN_8086", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             name.IndexOf("Intel", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        vendor = "Intel";
+                        isDiscrete = name.IndexOf("Arc", StringComparison.OrdinalIgnoreCase) >= 0;
+                    }
+
+                    string typeTag = isDiscrete ? "Discrete" : "Integrated";
+                    string display = $"{name} ({typeTag})";
+
+                    list.Add(new DetectedGpu
+                    {
+                        Index = list.Count,
+                        Name = name,
+                        Vendor = vendor,
+                        IsDiscrete = isDiscrete,
+                        DisplayText = display
+                    });
+                }
+            }
+            catch { }
+
+            if (list.Count == 0)
+            {
+                try
+                {
+                    using var baseKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}");
+                    if (baseKey != null)
+                    {
+                        foreach (string subName in baseKey.GetSubKeyNames())
+                        {
+                            if (!subName.StartsWith("0")) continue;
+                            using var subKey = baseKey.OpenSubKey(subName);
+                            if (subKey == null) continue;
+
+                            string name = subKey.GetValue("DriverDesc")?.ToString()?.Trim() ?? "";
+                            string pnp = subKey.GetValue("MatchingDeviceId")?.ToString()?.Trim() ?? "";
+                            if (string.IsNullOrEmpty(name)) continue;
+
+                            if (seenNames.Contains(name)) continue;
+                            seenNames.Add(name);
+
+                            string vendor = "Other";
+                            bool isDiscrete = false;
+
+                            if (pnp.IndexOf("VEN_10DE", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                name.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                vendor = "NVIDIA";
+                                isDiscrete = true;
+                            }
+                            else if (pnp.IndexOf("VEN_1002", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                     name.IndexOf("AMD", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                     name.IndexOf("Radeon", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                vendor = "AMD";
+                                bool isIntegrated = name.IndexOf("Graphics", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                                                    name.IndexOf("RX", StringComparison.OrdinalIgnoreCase) < 0 &&
+                                                    name.IndexOf("Pro", StringComparison.OrdinalIgnoreCase) < 0;
+                                isDiscrete = !isIntegrated;
+                            }
+                            else if (pnp.IndexOf("VEN_8086", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                     name.IndexOf("Intel", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                vendor = "Intel";
+                                isDiscrete = name.IndexOf("Arc", StringComparison.OrdinalIgnoreCase) >= 0;
+                            }
+
+                            string typeTag = isDiscrete ? "Discrete" : "Integrated";
+                            list.Add(new DetectedGpu
+                            {
+                                Index = list.Count,
+                                Name = name,
+                                Vendor = vendor,
+                                IsDiscrete = isDiscrete,
+                                DisplayText = $"{name} ({typeTag})"
+                            });
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (list.Count == 0)
+            {
+                list.Add(new DetectedGpu
+                {
+                    Index = 0,
+                    Name = "Graphics Adapter",
+                    Vendor = "Generic",
+                    IsDiscrete = false,
+                    DisplayText = "Graphics Adapter (Default)"
+                });
+            }
+
+            return list;
+        }
+    }
+
     public class LiveApp {
         [DllImport("user32.dll", SetLastError = true)]
         public static extern IntPtr OpenDesktop(string lpszDesktop, uint dwFlags, bool fInherit, uint dwDesiredAccess);
@@ -158,7 +319,9 @@ namespace Win11TaskbarMonitor.LiveDaemon {
         private static IntPtr _hCpuCounter = IntPtr.Zero;
         private static IntPtr _hGpuCounter = IntPtr.Zero;
         private static bool _hasPdh = false;
-        private static int _gpuMode = 2; // 2 = Auto / All GPUs (Default), 0 = Dedicated/NVIDIA, 1 = Integrated/Intel
+        private static readonly List<DetectedGpu> _detectedGpus = new();
+        private static int _gpuMode = -1; // -1 = Auto / All GPUs (Default), >= 0: index into _detectedGpus
+        private static string _selectedGpuName = "";
         private static readonly string _adjacentWndClass = Encoding.ASCII.GetString(Convert.FromBase64String("S2lsMGJpdE92ZXJsYXlXbmRDbGFzc19NYWlu"));
         private static int _styleMode = 0; // 0 = Native Taskbar, 1 = Fluent Capsule, 2 = Floating Card
         private static Mutex _singleInstanceMutex = null;
@@ -211,11 +374,11 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                         if (root.TryGetProperty("CompactMode", out var propCompact)) _compactMode = propCompact.GetBoolean();
                         if (root.TryGetProperty("CustomX", out var propX)) _customX = propX.GetInt32();
                         if (root.TryGetProperty("CustomY", out var propY)) _customY = propY.GetInt32();
+                        if (root.TryGetProperty("SelectedGpuName", out var propGpuName)) {
+                            _selectedGpuName = propGpuName.GetString() ?? "";
+                        }
                         if (root.TryGetProperty("SelectedGpuIndex", out var propGpu)) {
-                            int g = propGpu.GetInt32();
-                            if (g == 0) _gpuMode = 0;
-                            else if (g == 1) _gpuMode = 1;
-                            else _gpuMode = 2;
+                            _gpuMode = propGpu.GetInt32();
                         }
                         if (root.TryGetProperty("TemperatureUnit", out var propUnit)) {
                             string u = propUnit.GetString();
@@ -236,11 +399,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                     3 => "Custom",
                     _ => "Auto"
                 };
-                int selectedGpu = _gpuMode switch {
-                    0 => 0,
-                    1 => 1,
-                    _ => -1
-                };
+                string selGpuName = (_gpuMode >= 0 && _gpuMode < _detectedGpus.Count) ? _detectedGpus[_gpuMode].Name : "";
 
                 var cfg = new {
                     RefreshIntervalMs = 1000,
@@ -254,7 +413,8 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                     Alignment = alignStr,
                     FontSize = _compactMode ? 9.5 : 11.5,
                     CompactMode = _compactMode,
-                    SelectedGpuIndex = selectedGpu,
+                    SelectedGpuIndex = _gpuMode,
+                    SelectedGpuName = selGpuName,
                     IsLocked = _isLocked,
                     CustomX = _customX,
                     CustomY = _customY,
@@ -365,7 +525,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                     _cachedRam = (int)Math.Round(rPct, MidpointRounding.AwayFromZero);
                 }
 
-                // 3. GPU (Isolated discrete NVIDIA or integrated Intel)
+                // 3. GPU (Isolated or Auto tracking across detected GPUs)
                 double gpuPct = 0.0;
                 double nvmlGpu = 0.0;
                 if (_hasNvml) {
@@ -386,8 +546,8 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 }
 
                 double pdhMaxEngine = 0.0;
-                double intel3d = 0.0;
-                if (_hasPdh && _hGpuCounter != IntPtr.Zero && (_gpuMode != 0 || !_hasNvml)) {
+                double eng3d = 0.0;
+                if (_hasPdh && _hGpuCounter != IntPtr.Zero) {
                     try {
                         uint bufSize = 0, count = 0;
                         PdhGetFormattedCounterArray(_hGpuCounter, PDH_FMT_DOUBLE, ref bufSize, ref count, IntPtr.Zero);
@@ -405,7 +565,7 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                                                 string name = Marshal.PtrToStringUni(szName);
                                                 if (name != null) {
                                                     if (val > pdhMaxEngine) pdhMaxEngine = val;
-                                                    if (name.Contains("engtype_3D") && val > intel3d) intel3d = val;
+                                                    if (name.Contains("engtype_3D") && val > eng3d) eng3d = val;
                                                 }
                                             }
                                         }
@@ -418,14 +578,44 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                     } catch {}
                 }
 
-                if (_gpuMode == 0) {
-                    gpuPct = _hasNvml ? nvmlGpu : pdhMaxEngine;
-                } else if (_gpuMode == 1) {
-                    gpuPct = intel3d > 0 ? intel3d : pdhMaxEngine;
-                    _cachedGpuTempValid = false;
-                    _cachedGpuTempStr = "N/A";
-                    _cachedGpuTempIsCritical = false;
-                    _cachedGpuTempIsElevated = false;
+                if (_gpuMode == -1) {
+                    // Auto mode: peak engine utilization across all graphics adapters
+                    gpuPct = Math.Max(nvmlGpu, pdhMaxEngine);
+                    if (!_hasNvml || !_cachedGpuTempValid) {
+                        _cachedGpuTempValid = false;
+                        _cachedGpuTempStr = "N/A";
+                        _cachedGpuTempIsCritical = false;
+                        _cachedGpuTempIsElevated = false;
+                    }
+                } else if (_gpuMode >= 0 && _gpuMode < _detectedGpus.Count) {
+                    var curGpu = _detectedGpus[_gpuMode];
+                    if (string.Equals(curGpu.Vendor, "NVIDIA", StringComparison.OrdinalIgnoreCase)) {
+                        gpuPct = _hasNvml ? nvmlGpu : pdhMaxEngine;
+                        if (!_hasNvml || !_cachedGpuTempValid) {
+                            _cachedGpuTempValid = false;
+                            _cachedGpuTempStr = "N/A";
+                            _cachedGpuTempIsCritical = false;
+                            _cachedGpuTempIsElevated = false;
+                        }
+                    } else if (string.Equals(curGpu.Vendor, "Intel", StringComparison.OrdinalIgnoreCase)) {
+                        gpuPct = eng3d > 0 ? eng3d : pdhMaxEngine;
+                        _cachedGpuTempValid = false;
+                        _cachedGpuTempStr = "N/A";
+                        _cachedGpuTempIsCritical = false;
+                        _cachedGpuTempIsElevated = false;
+                    } else if (string.Equals(curGpu.Vendor, "AMD", StringComparison.OrdinalIgnoreCase)) {
+                        gpuPct = pdhMaxEngine;
+                        _cachedGpuTempValid = false;
+                        _cachedGpuTempStr = "N/A";
+                        _cachedGpuTempIsCritical = false;
+                        _cachedGpuTempIsElevated = false;
+                    } else {
+                        gpuPct = pdhMaxEngine;
+                        _cachedGpuTempValid = false;
+                        _cachedGpuTempStr = "N/A";
+                        _cachedGpuTempIsCritical = false;
+                        _cachedGpuTempIsElevated = false;
+                    }
                 } else {
                     gpuPct = Math.Max(nvmlGpu, pdhMaxEngine);
                 }
@@ -496,6 +686,25 @@ namespace Win11TaskbarMonitor.LiveDaemon {
             }
 
             LoadConfig();
+
+            // Dynamic GPU Hardware Detection
+            try {
+                _detectedGpus.Clear();
+                _detectedGpus.AddRange(GpuDetector.Detect());
+            } catch {}
+
+            // Reconcile selected GPU:
+            if (!string.IsNullOrEmpty(_selectedGpuName)) {
+                var found = _detectedGpus.Find(g => string.Equals(g.Name, _selectedGpuName, StringComparison.OrdinalIgnoreCase));
+                if (found != null) {
+                    _gpuMode = found.Index;
+                } else {
+                    _gpuMode = -1;
+                }
+            } else if (_gpuMode >= _detectedGpus.Count || _gpuMode < 0) {
+                _gpuMode = -1; // Auto
+            }
+
             if (posX > 0) {
                 _posMode = 3;
                 _customX = posX;
@@ -954,28 +1163,40 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                 posMenu.Items.Add(posCustom);
 
                 MenuItem gpuMenu = new MenuItem { Header = "GPU Telemetry Source" };
-                MenuItem gpuAuto = new MenuItem { Header = "Auto (All GPUs - Default)", IsCheckable = true, IsChecked = (_gpuMode == 2) };
-                MenuItem gpuNvidia = new MenuItem { Header = "NVIDIA GeForce MX350 (Discrete)", IsCheckable = true, IsChecked = (_gpuMode == 0) };
-                MenuItem gpuIntel = new MenuItem { Header = "Intel(R) Iris(R) Xe Graphics (Integrated - GPU 0)", IsCheckable = true, IsChecked = (_gpuMode == 1) };
+                List<MenuItem> gpuMenuItems = new List<MenuItem>();
 
+                Action updateGpuChecks = () => {
+                    for (int idx = 0; idx < gpuMenuItems.Count; idx++) {
+                        if (idx == 0) {
+                            gpuMenuItems[idx].IsChecked = (_gpuMode == -1);
+                        } else {
+                            int gIdx = idx - 1;
+                            gpuMenuItems[idx].IsChecked = (_gpuMode == gIdx);
+                        }
+                    }
+                };
+
+                MenuItem gpuAuto = new MenuItem { Header = "Auto (All GPUs - Recommended Default)", IsCheckable = true, IsChecked = (_gpuMode == -1) };
                 gpuAuto.Click += (s, e) => {
-                    _gpuMode = 2;
-                    gpuAuto.IsChecked = true; gpuNvidia.IsChecked = false; gpuIntel.IsChecked = false;
-                    SaveConfig();
-                };
-                gpuNvidia.Click += (s, e) => {
-                    _gpuMode = 0;
-                    gpuAuto.IsChecked = false; gpuNvidia.IsChecked = true; gpuIntel.IsChecked = false;
-                    SaveConfig();
-                };
-                gpuIntel.Click += (s, e) => {
-                    _gpuMode = 1;
-                    gpuAuto.IsChecked = false; gpuNvidia.IsChecked = false; gpuIntel.IsChecked = true;
+                    _gpuMode = -1;
+                    updateGpuChecks();
                     SaveConfig();
                 };
                 gpuMenu.Items.Add(gpuAuto);
-                gpuMenu.Items.Add(gpuNvidia);
-                gpuMenu.Items.Add(gpuIntel);
+                gpuMenuItems.Add(gpuAuto);
+
+                for (int i = 0; i < _detectedGpus.Count; i++) {
+                    int capturedIndex = i;
+                    var dGpu = _detectedGpus[i];
+                    MenuItem mi = new MenuItem { Header = dGpu.DisplayText, IsCheckable = true, IsChecked = (_gpuMode == capturedIndex) };
+                    mi.Click += (s, e) => {
+                        _gpuMode = capturedIndex;
+                        updateGpuChecks();
+                        SaveConfig();
+                    };
+                    gpuMenu.Items.Add(mi);
+                    gpuMenuItems.Add(mi);
+                }
 
                 MenuItem itemReset = new MenuItem { Header = "Recalculate Equal Margins" };
                 itemReset.Click += (s, e) => {
@@ -1062,9 +1283,13 @@ namespace Win11TaskbarMonitor.LiveDaemon {
                             ? string.Format("CPU: {0} ({1})", txtCpu.Text, txtCpuT.Text)
                             : string.Format("CPU: {0}", txtCpu.Text);
                         string ramLine = string.Format("RAM: {0:F1} / {1:F1} GB ({2})", _cachedUsedGb, _cachedTotGb, txtRam.Text);
+                        string activeGpuName = (_gpuMode >= 0 && _gpuMode < _detectedGpus.Count)
+                            ? _detectedGpus[_gpuMode].Name
+                            : (_detectedGpus.Count > 0 ? _detectedGpus[0].Name : "");
+                        string gpuHeader = !string.IsNullOrEmpty(activeGpuName) ? string.Format("GPU ({0})", activeGpuName) : "GPU";
                         string gpuLine = (_hasNvml && _cachedGpuTempValid) 
-                            ? string.Format("GPU: {0} ({1})", txtGpu.Text, txtGpuT.Text)
-                            : string.Format("GPU: {0}", txtGpu.Text);
+                            ? string.Format("{0}: {1} ({2})", gpuHeader, txtGpu.Text, txtGpuT.Text)
+                            : string.Format("{0}: {1}", gpuHeader, txtGpu.Text);
                         ttText.Text = string.Format("{0}\n{1}\n{2}", cpuLine, ramLine, gpuLine);
 
                         // Position checking without heavy process enumeration
